@@ -544,7 +544,7 @@ public class CoreApplication extends Application {
         rightBox.setSpacing(7);
         HBox buttonBox = new HBox();
         buttonBox.setSpacing(7);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
         add = new Button("Add");
         add.setOnAction(new EventHandler<ActionEvent>() {
             @Override
@@ -583,9 +583,9 @@ public class CoreApplication extends Application {
         buttonBox.getChildren().add(add);
         buttonBox.getChildren().add(save);
         buttonBox.getChildren().add(delete);
-        rightBox.getChildren().add(buttonBox);
         scenarioBox.getChildren().add(rightBox);
         centrallayout.getChildren().add(scenarioBox);
+        centrallayout.getChildren().add(buttonBox);
 
         mainlayout.getChildren().add(centrallayout);
         table = new TableView<>();

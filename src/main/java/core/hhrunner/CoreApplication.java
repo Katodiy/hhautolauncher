@@ -14,11 +14,9 @@ import javafx.scene.chart.PieChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.image.Image;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import json.JSONArray;
 import json.JSONObject;
@@ -321,7 +319,50 @@ public class CoreApplication extends Application {
             }
         });
 
-        menu1.getItems().addAll(openn, openi, savei);
+        MenuItem config = new MenuItem("Configuration");
+        config.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                // New window (Stage)
+                Stage newWindow = new Stage();
+                newWindow.setTitle("Configuration");
+                newWindow.initModality(Modality.WINDOW_MODAL);
+                newWindow.initOwner(stage);
+                VBox mainlayout = new VBox();
+                VBox.setMargin(mainlayout, new Insets(5,5,5,10));
+                VBox centrallayout = new VBox();
+                VBox.setMargin(centrallayout, new Insets(5,5,5,10));
+                centrallayout.setSpacing(5);
+                centrallayout.getChildren().add(new Label("Java path:"));
+                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().javaPath, "Java VM", "java.exe"));
+                centrallayout.getChildren().add(new Label("Hafen path:"));
+                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().hafenPath,"HnH jar file", "hafen.jar"));
+                centrallayout.getChildren().add(new Label("Hafen config and calibration path:"));
+                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().ncacPath, "Nurgling config", "config.nurgling.json"));
+                CheckBox java18 = new CheckBox("Java 18+ (Oracle)");
+                java18.setSelected(Configuration.getInstance().isJava18);
+                java18.selectedProperty().addListener(new ChangeListener<Boolean>() {
+
+                    @Override
+                    public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
+                        Configuration.getInstance().isJava18 = newValue;
+                        Configuration.getInstance().write();
+                    }
+                });
+                centrallayout.getChildren().add(java18);
+                mainlayout.getChildren().add(centrallayout);
+                Scene scene = new Scene(mainlayout, 315, 220);
+                newWindow.setScene(scene);
+
+                // Set position of second window, related to primary window.
+                newWindow.setX(stage.getX() + 200);
+                newWindow.setY(stage.getY() + 100);
+
+                newWindow.show();
+            }
+        });
+
+        menu1.getItems().addAll(openn, openi, savei, config);
 
         ObservableList<String> langs = FXCollections.observableArrayList();
         scenariosCombobox = new ComboBox<String>(langs);
@@ -494,7 +535,7 @@ public class CoreApplication extends Application {
         VBox rightBox = new VBox();
         list = new ListView<String>();
         ObservableList<String> items =FXCollections.observableArrayList (
-                "Dreamer", "Candleberry", "Steel", "Smelter", "Clay", "Truffle");
+                "Dreamer", "Candleberry", "Steel", "Smelter", "Clay", "Truffle", "GobFinder");
         list.setItems(items);
         list.setMinHeight(320);
         list.setMaxHeight(390);
@@ -616,7 +657,35 @@ public class CoreApplication extends Application {
         stage.show();
     }
 
-
+    HBox setPath(Stage stage, Configuration.Path path, String name, String filter)
+    {
+        HBox cacpbox  = new HBox();
+        TextField configPath = new TextField();
+        configPath.setText(path.value);
+        configPath.setPrefWidth(276);
+        Region fillern = new Region();
+        HBox.setHgrow(fillern, Priority.ALWAYS);
+        cacpbox.getChildren().add(fillern);
+        cacpbox.getChildren().add(configPath);
+        Button configSelect = new Button("...");
+        configSelect.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                FileChooser fileChooser = new FileChooser();
+                FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter(name, filter);
+                fileChooser.getExtensionFilters().add(extFilter);
+                fileChooser.setTitle("Select path");
+                File file = fileChooser.showOpenDialog(stage);
+                if(file!=null && file.exists()) {
+                    configPath.setText(file.getPath());
+                    path.value = file.getPath();
+                    Configuration.getInstance().write();
+                }
+            }
+        });
+        cacpbox.getChildren().add(configSelect);
+        return cacpbox;
+    }
 
     public static void main(String[] args) {
         launch();

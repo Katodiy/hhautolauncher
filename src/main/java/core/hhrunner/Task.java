@@ -31,15 +31,13 @@ public class Task {
     Process p = null;
     public long start;
     public long stop;
-
     File bot_config;
 
     public Task(long start, Scenario scenario) {
         this.scenario = scenario;
         this.name = scenario.name;
         this.start = start;
-        this.stop = start + ((long) scenario.duration * 60 * 1000);
-        p = null;
+        this.stop = start + ((long) scenario.duration * 60 * 1000);p = null;
     }
 
     public boolean isWork(){
@@ -49,7 +47,14 @@ public class Task {
     public void startProcess(String path) throws IOException {
         bot_config = File.createTempFile("bot_config-",".json");
         write(bot_config.getPath());
-        p = Runtime.getRuntime().exec("java -jar " + path + " -bots " + bot_config.getPath());
+        if(Configuration.getInstance().isJava18)
+        {
+            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + "-jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED" + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+        }
+        else
+        {
+            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + "-jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+        }
     }
 
     public void stopProcess() {
@@ -68,6 +73,7 @@ public class Task {
         obj.put ( "character", scenario.character );
         obj.put ( "bot", scenario.bot );
         obj.put ( "nomad", scenario.nomad );
+        obj.put ( "config_path", Configuration.getInstance().ncacPath.value );
 
         try ( FileWriter file = new FileWriter ( path ) ) {
             file.write ( obj.toJSONString () );

@@ -108,7 +108,7 @@ public class CoreApplication extends Application {
                 for(Task task: tasks){
                     if(!task.isWork() && task.start<=time){
                         try {
-                            task.startProcess(path);
+                            task.startProcess(Configuration.getInstance().hafenPath.value);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -338,7 +338,7 @@ public class CoreApplication extends Application {
                 centrallayout.getChildren().add(new Label("Hafen path:"));
                 centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().hafenPath,"HnH jar file", "hafen.jar"));
                 centrallayout.getChildren().add(new Label("Hafen config and calibration path:"));
-                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().ncacPath, "Nurgling config", "config.nurgling.json"));
+                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().ncacPath, "Calibration file", "calibr.json"));
                 CheckBox java18 = new CheckBox("Java 18+ (Oracle)");
                 java18.setSelected(Configuration.getInstance().isJava18);
                 java18.selectedProperty().addListener(new ChangeListener<Boolean>() {
@@ -535,7 +535,7 @@ public class CoreApplication extends Application {
         VBox rightBox = new VBox();
         list = new ListView<String>();
         ObservableList<String> items =FXCollections.observableArrayList (
-                "Dreamer", "Candleberry", "Steel", "Smelter", "Clay", "Truffle", "GobFinder");
+                "Dreamer", "Candleberry", "Steel", "Smelter", "Clay", "Truffle", "GobFinder", "Dryer", "Tanning", "CheeseCellar", "CheeseHome", "CheeseOutside", "CheeseMine", "CheeseBarters", "CowsCurd", "GoatsCurd", "SheepsCurd");
         list.setItems(items);
         list.setMinHeight(320);
         list.setMaxHeight(390);

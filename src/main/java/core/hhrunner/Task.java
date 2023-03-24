@@ -49,11 +49,11 @@ public class Task {
         write(bot_config.getPath());
         if(Configuration.getInstance().isJava18)
         {
-            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + "-jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED" + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
         }
         else
         {
-            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + "-jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
         }
     }
 

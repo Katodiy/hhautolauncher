@@ -3,9 +3,7 @@ package core.hhrunner;
 import json.JSONArray;
 import json.JSONObject;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -49,11 +47,35 @@ public class Task {
         write(bot_config.getPath());
         if(Configuration.getInstance().isJava18)
         {
+            System.out.println(Configuration.getInstance().javaPath.value + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
             p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+
         }
         else
         {
+            System.out.println(Configuration.getInstance().javaPath.value + " -jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
             p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+        }
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(p.getErrorStream()));
+
+        try {
+            int err = p.waitFor();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        while ((s = stdError.readLine()) != null) {
+
+            System.out.println(s);
         }
     }
 

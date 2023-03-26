@@ -47,36 +47,37 @@ public class Task {
         write(bot_config.getPath());
         if(Configuration.getInstance().isJava18)
         {
-            System.out.println(Configuration.getInstance().javaPath.value + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
-            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+            String cmd = "\"" + Configuration.getInstance().javaPath.value + "\"" + " -jar -Xms4g -Xmx4g --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED --add-exports java.desktop/sun.java2d=ALL-UNNAMED " + "\"" + Configuration.getInstance().hafenPath.value + "\"" + " -bots " + "\"" +bot_config.getPath() + "\"";
+            System.out.println(cmd);
+            p = Runtime.getRuntime().exec(cmd);
 
         }
-        else
-        {
-            System.out.println(Configuration.getInstance().javaPath.value + " -jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
-            p = Runtime.getRuntime().exec(Configuration.getInstance().javaPath.value + " -jar " + Configuration.getInstance().hafenPath.value + " -bots " + bot_config.getPath());
+        else {
+            String cmd = "\"" + Configuration.getInstance().javaPath.value + "\"" + " -jar " + "\"" + Configuration.getInstance().hafenPath.value + "\"" + " -bots " + "\"" + bot_config.getPath() + "\"";
+            System.out.println(cmd);
+            p = Runtime.getRuntime().exec(cmd);
         }
-
-        BufferedReader stdInput = new BufferedReader(new
-                InputStreamReader(p.getInputStream()));
-
-        BufferedReader stdError = new BufferedReader(new
-                InputStreamReader(p.getErrorStream()));
-
-        try {
-            int err = p.waitFor();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        String s = null;
-        while ((s = stdInput.readLine()) != null) {
-            System.out.println(s);
-        }
-
-        while ((s = stdError.readLine()) != null) {
-
-            System.out.println(s);
-        }
+//
+//        BufferedReader stdInput = new BufferedReader(new
+//                InputStreamReader(p.getInputStream()));
+//
+//        BufferedReader stdError = new BufferedReader(new
+//                InputStreamReader(p.getErrorStream()));
+//
+//        try {
+//            int err = p.waitFor();
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
+//        String s = null;
+//        while ((s = stdInput.readLine()) != null) {
+//            System.out.println(s);
+//        }
+//
+//        while ((s = stdError.readLine()) != null) {
+//
+//            System.out.println(s);
+//        }
     }
 
     public void stopProcess() {

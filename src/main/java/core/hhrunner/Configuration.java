@@ -31,7 +31,6 @@ public class Configuration {
     Path javaPath = new Path();
     Path hafenPath = new Path();
     // Config and Calibration for nurgling
-    Path ncacPath = new Path();
 
     public Configuration() {
 
@@ -39,7 +38,6 @@ public class Configuration {
 
     public void write() {
         JSONObject obj = new JSONObject();
-        obj.put("ncacPath", ncacPath.value);
         obj.put("hafenPath", hafenPath.value);
         obj.put("javaPath", javaPath.value);
         obj.put("isJava18", isJava18);
@@ -70,8 +68,6 @@ public class Configuration {
                 javaPath.value = jsonObject.get("javaPath").toString();
             if(jsonObject.get("hafenPath")!=null)
                 hafenPath.value = jsonObject.get("hafenPath").toString();
-            if(jsonObject.get("ncacPath")!=null)
-                ncacPath.value = jsonObject.get("ncacPath").toString();
             if(jsonObject.get("isJava18")!=null)
             isJava18 = (boolean) jsonObject.get("isJava18");
         }

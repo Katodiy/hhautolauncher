@@ -96,7 +96,7 @@ public class Task {
         obj.put ( "character", scenario.character );
         obj.put ( "bot", scenario.bot );
         obj.put ( "nomad", scenario.nomad );
-        obj.put ( "config_path", Configuration.getInstance().ncacPath.value );
+
 
         try ( FileWriter file = new FileWriter ( path ) ) {
             file.write ( obj.toJSONString () );

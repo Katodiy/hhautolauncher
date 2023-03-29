@@ -273,6 +273,12 @@ public class CoreApplication extends Application {
     }
 
     @Override
+    public void stop() throws Exception {
+        isWork.set(false);
+        super.stop();
+    }
+
+    @Override
     public void start(Stage stage) throws IOException {
         /// Главное меню
         MenuBar menuBar = new MenuBar();
@@ -337,8 +343,6 @@ public class CoreApplication extends Application {
                 centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().javaPath, "Java VM", "java.exe"));
                 centrallayout.getChildren().add(new Label("Hafen path:"));
                 centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().hafenPath,"HnH jar file", "hafen.jar"));
-                centrallayout.getChildren().add(new Label("Hafen config and calibration path:"));
-                centrallayout.getChildren().add(setPath(stage,Configuration.getInstance().ncacPath, "Calibration file", "calibr.json"));
                 CheckBox java18 = new CheckBox("Java 18+ (Oracle)");
                 java18.setSelected(Configuration.getInstance().isJava18);
                 java18.selectedProperty().addListener(new ChangeListener<Boolean>() {

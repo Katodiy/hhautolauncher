@@ -22,6 +22,7 @@ import json.JSONObject;
 import json.parser.JSONParser;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CoreApplication extends Application {
+    private static final String AUTOMATIONS_FILE = "automations.json";
 
     TextField title;
     TextField user;
@@ -166,8 +168,8 @@ public class CoreApplication extends Application {
         obj.put("automations", jAutomations);
 
 
-        try ( FileWriter file = new FileWriter ( path ) ) {
-            file.write ( obj.toJSONString () );
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(path), java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(obj.toJSONString());
         }
         catch ( IOException e ) {
             e.printStackTrace ();
@@ -177,9 +179,15 @@ public class CoreApplication extends Application {
 
 
     public void read ( String path ) {
+        File file = new File(path);
+        if (!file.exists()) {
+            // No automations saved yet; nothing to load.
+            return;
+        }
+
         try {
-            BufferedReader reader = new BufferedReader (
-                    new InputStreamReader( new FileInputStream( path ), "cp1251" ) );
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader( new FileInputStream( path ), StandardCharsets.UTF_8 ) );
             JSONParser parser = new JSONParser();
             JSONObject jsonObject = ( JSONObject ) parser.parse ( reader );
 
@@ -203,13 +211,6 @@ public class CoreApplication extends Application {
                     automations.put(auto.name, auto);
                 }
 
-                if(automations.size()>0){
-                    automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
-                    for(String key: automations.keySet()){
-                        automationComboBox.getSelectionModel().select(key);
-                        break;
-                    }
-                }
             }
 
 
@@ -243,6 +244,7 @@ public class CoreApplication extends Application {
         automations.put(res.name,res);
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
+        write(AUTOMATIONS_FILE);
     }
 
     public void save(){
@@ -250,6 +252,7 @@ public class CoreApplication extends Application {
         automations.put(res.name,res);
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
+        write(AUTOMATIONS_FILE);
     }
     public void show(String name){
 
@@ -278,6 +281,7 @@ public class CoreApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
+        read(AUTOMATIONS_FILE);
         /// Главное меню
         MenuBar menuBar = new MenuBar();
         Menu menu1 = new Menu("File");
@@ -369,6 +373,15 @@ public class CoreApplication extends Application {
         ObservableList<String> langs = FXCollections.observableArrayList();
         automationComboBox = new ComboBox<String>(langs);
         automationComboBox.setMinWidth(620);
+
+        automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        if (!automations.isEmpty()) {
+            for (String key : automations.keySet()) {
+                automationComboBox.getSelectionModel().select(key);
+                break;
+            }
+        }
+
         automationComboBox.valueProperty().addListener(new ChangeListener<String>() {
             @Override public void changed(ObservableValue ov, String t, String t1) {
                 if(t1!=null) {
@@ -579,6 +592,7 @@ public class CoreApplication extends Application {
                 }else{
                     clear();
                 }
+                write(AUTOMATIONS_FILE);
             }
         });
         HBox.setHgrow(buttonBox, Priority.ALWAYS);

@@ -9,6 +9,7 @@ import json.parser.ParseException;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 
 public class Configuration {
@@ -44,9 +45,9 @@ public class Configuration {
         if (url != null) {
             try {
                 String path = url.toURI().getPath().substring(0, url.toURI().getPath().lastIndexOf("/")) + "/hhrunner.config.json";
-                FileWriter file = new FileWriter(path);
-                file.write(obj.toJSONString());
-                file.close();
+                try (Writer writer = new OutputStreamWriter(new FileOutputStream(path), StandardCharsets.UTF_8)) {
+                    writer.write(obj.toJSONString());
+                }
             } catch (IOException | URISyntaxException e) {
                 e.printStackTrace();
             }
@@ -59,7 +60,7 @@ public class Configuration {
             URL url = Configuration.class.getProtectionDomain().getCodeSource().getLocation();
             String path = url.toURI().getPath().substring(0, url.toURI().getPath().lastIndexOf("/")) + "/hhrunner.config.json";
             BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(new FileInputStream(path), "cp1251"));
+                    new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8));
             JSONParser parser = new JSONParser();
             JSONObject jsonObject = (JSONObject) parser.parse(reader);
 

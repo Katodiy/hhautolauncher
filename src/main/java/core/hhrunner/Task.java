@@ -96,8 +96,8 @@ public class Task {
         obj.put ( "scenarioId", automation.scenarioId );
 
 
-        try ( FileWriter file = new FileWriter ( path ) ) {
-            file.write ( obj.toJSONString () );
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(path), java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(obj.toJSONString());
         }
         catch ( IOException e ) {
             e.printStackTrace ();

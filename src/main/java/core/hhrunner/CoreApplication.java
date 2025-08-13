@@ -72,15 +72,23 @@ public class CoreApplication extends Application {
         isStartTime.setSelected(false);
         dataPicker.setTime(0);
         nomadPath.setText("");
-        automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        refreshAutomationComboBox();
     }
 
     Process p;
 
     HashMap<String,Automation> automations = new HashMap<>();
     HashMap<Integer, Scenario> loadedScenarios = new HashMap<>();
+    HashMap<String, Schedule> schedules = new HashMap<>();
+    String currentScheduleName = "Default Schedule";
+    
     ListView<String> scenarioPicker;
     ComboBox<String> automationComboBox;
+    ComboBox<String> scheduleComboBox;
+    Button newScheduleButton;
+    Button saveScheduleButton;
+    Button deleteScheduleButton;
+    Button renameScheduleButton;
 
     public AtomicBoolean isWork = new AtomicBoolean(false);
     Thread th = null;
@@ -220,6 +228,165 @@ public class CoreApplication extends Application {
         }
     }
 
+    public void saveSchedules() {
+        updateCurrentSchedule();
+        String path = getScheduleFilePath();
+        
+        JSONObject obj = new JSONObject();
+        JSONArray jSchedules = new JSONArray();
+        
+        for (String key : schedules.keySet()) {
+            Schedule schedule = schedules.get(key);
+            JSONObject objSchedule = new JSONObject();
+            objSchedule.put("name", schedule.name);
+            objSchedule.put("description", schedule.description);
+            objSchedule.put("createdTime", schedule.createdTime);
+            objSchedule.put("lastModified", schedule.lastModified);
+            
+            JSONArray jAutomations = new JSONArray();
+            for (String autoKey : schedule.automations.keySet()) {
+                Automation auto = schedule.automations.get(autoKey);
+                JSONObject objAuto = new JSONObject();
+                objAuto.put("name", auto.name);
+                objAuto.put("user", auto.user);
+                objAuto.put("password", auto.password);
+                objAuto.put("character", auto.character);
+                objAuto.put("scenarioId", auto.scenarioId);
+                objAuto.put("isStartTime", auto.isStartTime);
+                objAuto.put("startTime", auto.startTime);
+                objAuto.put("disabled", auto.disabled);
+                objAuto.put("isRepeted", auto.isRepeted);
+                objAuto.put("duration", auto.duration);
+                objAuto.put("interval", auto.interval);
+                jAutomations.add(objAuto);
+            }
+            objSchedule.put("automations", jAutomations);
+            jSchedules.add(objSchedule);
+        }
+        
+        obj.put("schedules", jSchedules);
+        obj.put("activeSchedule", currentScheduleName);
+        
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(path), StandardCharsets.UTF_8)) {
+            writer.write(obj.toJSONString());
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void loadSchedules() {
+        String path = getScheduleFilePath();
+        File file = new File(path);
+        
+        if (!file.exists()) {
+            migrateFromOldAutomations();
+            return;
+        }
+
+        try {
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8));
+            JSONParser parser = new JSONParser();
+            JSONObject jsonObject = (JSONObject) parser.parse(reader);
+
+            schedules.clear();
+            JSONArray jSchedules = (JSONArray) jsonObject.get("schedules");
+            if (jSchedules != null) {
+                Iterator<JSONObject> iterator = jSchedules.iterator();
+                while (iterator.hasNext()) {
+                    JSONObject item = iterator.next();
+                    Schedule schedule = new Schedule();
+                    schedule.name = item.get("name").toString();
+                    schedule.description = item.get("description") != null ? item.get("description").toString() : "";
+                    schedule.createdTime = item.get("createdTime") != null ? (long)item.get("createdTime") : System.currentTimeMillis();
+                    schedule.lastModified = item.get("lastModified") != null ? (long)item.get("lastModified") : System.currentTimeMillis();
+                    
+                    JSONArray jAutomations = (JSONArray) item.get("automations");
+                    if (jAutomations != null) {
+                        Iterator<JSONObject> autoIterator = jAutomations.iterator();
+                        while (autoIterator.hasNext()) {
+                            JSONObject autoItem = autoIterator.next();
+                            Automation auto = new Automation();
+                            auto.name = autoItem.get("name").toString();
+                            auto.user = autoItem.get("user").toString();
+                            auto.password = autoItem.get("password").toString();
+                            auto.character = autoItem.get("character").toString();
+                            auto.scenarioId = ((Number) autoItem.get("scenarioId")).intValue();
+                            auto.isStartTime = (boolean)autoItem.get("isStartTime");
+                            if(autoItem.get("startTime") != null) auto.startTime = (long)autoItem.get("startTime");
+                            auto.disabled = (boolean)autoItem.get("disabled");
+                            auto.isRepeted = (boolean)autoItem.get("isRepeted");
+                            auto.duration = ((Number)autoItem.get("duration")).intValue();
+                            auto.interval = ((Number)autoItem.get("interval")).intValue();
+                            schedule.automations.put(auto.name, auto);
+                        }
+                    }
+                    schedules.put(schedule.name, schedule);
+                }
+            }
+            
+            if (jsonObject.get("activeSchedule") != null) {
+                currentScheduleName = jsonObject.get("activeSchedule").toString();
+            }
+            
+            if (schedules.isEmpty()) {
+                createDefaultSchedule();
+            }
+            
+            if (!schedules.containsKey(currentScheduleName)) {
+                currentScheduleName = schedules.keySet().iterator().next();
+            }
+            
+            loadCurrentSchedule();
+            
+        } catch (IOException | json.parser.ParseException e) {
+            e.printStackTrace();
+            createDefaultSchedule();
+        }
+    }
+
+    private void migrateFromOldAutomations() {
+        File oldFile = new File(AUTOMATIONS_FILE);
+        if (oldFile.exists()) {
+            read(AUTOMATIONS_FILE);
+            Schedule defaultSchedule = new Schedule("Default Schedule", "Migrated from automations.json");
+            defaultSchedule.automations.putAll(automations);
+            schedules.put(defaultSchedule.name, defaultSchedule);
+            currentScheduleName = defaultSchedule.name;
+            saveSchedules();
+            
+            File backupFile = new File(AUTOMATIONS_FILE + ".backup");
+            oldFile.renameTo(backupFile);
+        } else {
+            createDefaultSchedule();
+        }
+    }
+
+    private void createDefaultSchedule() {
+        Schedule defaultSchedule = new Schedule("Default Schedule", "Default automation schedule");
+        schedules.put(defaultSchedule.name, defaultSchedule);
+        currentScheduleName = defaultSchedule.name;
+        automations.clear();
+    }
+
+    private void updateCurrentSchedule() {
+        if (schedules.containsKey(currentScheduleName)) {
+            Schedule current = schedules.get(currentScheduleName);
+            current.automations.clear();
+            current.automations.putAll(automations);
+            current.updateModifiedTime();
+        }
+    }
+
+    private void loadCurrentSchedule() {
+        if (schedules.containsKey(currentScheduleName)) {
+            Schedule current = schedules.get(currentScheduleName);
+            automations.clear();
+            automations.putAll(current.automations);
+        }
+    }
+
     private Automation build() {
         Automation auto = new Automation();
         auto.name = title.getText();
@@ -245,7 +412,7 @@ public class CoreApplication extends Application {
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
         show(res.name);
-        write(AUTOMATIONS_FILE);
+        saveSchedules();
     }
 
     public void save(){
@@ -254,7 +421,99 @@ public class CoreApplication extends Application {
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
         show(res.name);
-        write(AUTOMATIONS_FILE);
+        saveSchedules();
+    }
+
+    public void createNewSchedule(String name, String description) {
+        if (schedules.containsKey(name)) {
+            return; // Schedule already exists
+        }
+        
+        updateCurrentSchedule();
+        Schedule newSchedule = new Schedule(name, description);
+        schedules.put(name, newSchedule);
+        currentScheduleName = name;
+        loadCurrentSchedule();
+        refreshScheduleComboBox();
+        refreshAutomationComboBox();
+        clear();
+        saveSchedules();
+    }
+
+    public void switchToSchedule(String scheduleName) {
+        if (!schedules.containsKey(scheduleName)) {
+            return;
+        }
+        
+        updateCurrentSchedule();
+        currentScheduleName = scheduleName;
+        loadCurrentSchedule();
+        refreshAutomationComboBox();
+        
+        if (!automations.isEmpty()) {
+            automationComboBox.getSelectionModel().selectFirst();
+            show(automationComboBox.getSelectionModel().getSelectedItem());
+        } else {
+            clear();
+        }
+        saveSchedules();
+    }
+
+    public void deleteSchedule(String scheduleName) {
+        if (schedules.size() <= 1) {
+            return; // Cannot delete the last schedule
+        }
+        
+        schedules.remove(scheduleName);
+        
+        if (currentScheduleName.equals(scheduleName)) {
+            currentScheduleName = schedules.keySet().iterator().next();
+            loadCurrentSchedule();
+            refreshAutomationComboBox();
+            if (!automations.isEmpty()) {
+                automationComboBox.getSelectionModel().selectFirst();
+                show(automationComboBox.getSelectionModel().getSelectedItem());
+            } else {
+                clear();
+            }
+        }
+        
+        refreshScheduleComboBox();
+        saveSchedules();
+    }
+
+    public void renameSchedule(String oldName, String newName, String newDescription) {
+        if (!schedules.containsKey(oldName) || schedules.containsKey(newName)) {
+            return;
+        }
+        
+        Schedule schedule = schedules.get(oldName);
+        schedule.name = newName;
+        schedule.description = newDescription;
+        schedule.updateModifiedTime();
+        
+        schedules.remove(oldName);
+        schedules.put(newName, schedule);
+        
+        if (currentScheduleName.equals(oldName)) {
+            currentScheduleName = newName;
+        }
+        
+        refreshScheduleComboBox();
+        saveSchedules();
+    }
+
+    private void refreshScheduleComboBox() {
+        if (scheduleComboBox != null) {
+            scheduleComboBox.setItems(FXCollections.observableArrayList(schedules.keySet()));
+            scheduleComboBox.getSelectionModel().select(currentScheduleName);
+        }
+    }
+
+    private void refreshAutomationComboBox() {
+        if (automationComboBox != null) {
+            automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        }
     }
 
     public void show(String name){
@@ -291,7 +550,7 @@ public class CoreApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
-        read(AUTOMATIONS_FILE);
+        loadSchedules();
         /// Главное меню
         MenuBar menuBar = new MenuBar();
         Menu menu1 = new Menu("File");
@@ -302,6 +561,7 @@ public class CoreApplication extends Application {
                               public void handle(ActionEvent event) {
                                   automations.clear();
                                   clear();
+                                  saveSchedules();
                               }
 
         });
@@ -318,6 +578,8 @@ public class CoreApplication extends Application {
                 if(file!=null && file.exists()) {
                     automations.clear();
                     read(file.getPath());
+                    saveSchedules();
+                    refreshAutomationComboBox();
                 }
             }
         });
@@ -398,6 +660,56 @@ public class CoreApplication extends Application {
         VBox centrallayout = new VBox();
         VBox.setMargin(centrallayout, new Insets(5,5,5,10));
         centrallayout.setSpacing(5);
+        
+        // Schedule management section
+        HBox scheduleSection = new HBox();
+        scheduleSection.setSpacing(5);
+        scheduleSection.setAlignment(Pos.CENTER_LEFT);
+        
+        VBox scheduleSelectionBox = new VBox();
+        scheduleSelectionBox.setSpacing(3);
+        scheduleSelectionBox.getChildren().add(new Label("Schedule:"));
+        
+        scheduleComboBox = new ComboBox<>();
+        scheduleComboBox.setMinWidth(300);
+        scheduleComboBox.valueProperty().addListener(new ChangeListener<String>() {
+            @Override
+            public void changed(ObservableValue ov, String oldValue, String newValue) {
+                if (newValue != null && !newValue.equals(currentScheduleName)) {
+                    switchToSchedule(newValue);
+                }
+            }
+        });
+        scheduleSelectionBox.getChildren().add(scheduleComboBox);
+        
+        VBox scheduleButtonsBox = new VBox();
+        scheduleButtonsBox.setSpacing(3);
+        scheduleButtonsBox.getChildren().add(new Label("Actions:"));
+        
+        HBox scheduleButtons = new HBox();
+        scheduleButtons.setSpacing(5);
+        
+        newScheduleButton = new Button("New");
+        newScheduleButton.setOnAction(e -> showNewScheduleDialog());
+        
+        saveScheduleButton = new Button("Save All");
+        saveScheduleButton.setOnAction(e -> saveSchedules());
+        
+        deleteScheduleButton = new Button("Delete");
+        deleteScheduleButton.setOnAction(e -> showDeleteScheduleDialog());
+        
+        renameScheduleButton = new Button("Rename");
+        renameScheduleButton.setOnAction(e -> showRenameScheduleDialog());
+        
+        scheduleButtons.getChildren().addAll(newScheduleButton, saveScheduleButton, deleteScheduleButton, renameScheduleButton);
+        scheduleButtonsBox.getChildren().add(scheduleButtons);
+        
+        scheduleSection.getChildren().addAll(scheduleSelectionBox, scheduleButtonsBox);
+        centrallayout.getChildren().add(scheduleSection);
+        
+        // Separator
+        centrallayout.getChildren().add(new Label(""));
+        
         centrallayout.getChildren().add(new Label("Task:"));
         centrallayout.getChildren().add(automationComboBox);
 
@@ -586,13 +898,13 @@ public class CoreApplication extends Application {
             public void handle(ActionEvent event) {
                 automations.remove(automationComboBox.getSelectionModel().getSelectedItem());
                 if(automations.size()>0){
-                    automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+                    refreshAutomationComboBox();
                     automationComboBox.getSelectionModel().selectFirst();
                     show(automationComboBox.getSelectionModel().getSelectedItem());
                 }else{
                     clear();
                 }
-                write(AUTOMATIONS_FILE);
+                saveSchedules();
             }
         });
         HBox.setHgrow(buttonBox, Priority.ALWAYS);
@@ -665,14 +977,16 @@ public class CoreApplication extends Application {
         mainButton.getChildren().add(stopb);
 
         mainlayout.getChildren().add(mainButton);
-        Scene scene = new Scene(mainlayout, 640, 660);
+        Scene scene = new Scene(mainlayout, 640, 720);
         stage.setMaxWidth(660);
         stage.setMinWidth(660);
         stage.setTitle("HH client: Nurgling");
         stage.getIcons().add(new Image(
                         getClass().getResourceAsStream( "/timer.png" )));
 
-        automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        refreshScheduleComboBox();
+        refreshAutomationComboBox();
+        
         if (!automations.isEmpty()) {
             automationComboBox.getSelectionModel().selectFirst();
             show(automationComboBox.getSelectionModel().getSelectedItem());
@@ -680,6 +994,101 @@ public class CoreApplication extends Application {
 
         stage.setScene(scene);
         stage.show();
+    }
+
+    private void showNewScheduleDialog() {
+        Stage dialog = new Stage();
+        dialog.setTitle("New Schedule");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        
+        Label nameLabel = new Label("Schedule Name:");
+        TextField nameField = new TextField();
+        nameField.setPromptText("Enter schedule name");
+        
+        Label descLabel = new Label("Description (optional):");
+        TextField descField = new TextField();
+        descField.setPromptText("Enter description");
+        
+        HBox buttons = new HBox(10);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        
+        Button createButton = new Button("Create");
+        createButton.setOnAction(e -> {
+            String name = nameField.getText().trim();
+            if (!name.isEmpty() && !schedules.containsKey(name)) {
+                createNewSchedule(name, descField.getText().trim());
+                dialog.close();
+            }
+        });
+        
+        Button cancelButton = new Button("Cancel");
+        cancelButton.setOnAction(e -> dialog.close());
+        
+        buttons.getChildren().addAll(cancelButton, createButton);
+        layout.getChildren().addAll(nameLabel, nameField, descLabel, descField, buttons);
+        
+        Scene scene = new Scene(layout, 300, 200);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
+    private void showDeleteScheduleDialog() {
+        if (schedules.size() <= 1) {
+            return; // Cannot delete the last schedule
+        }
+        
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete Schedule");
+        alert.setHeaderText("Delete Schedule: " + currentScheduleName);
+        alert.setContentText("Are you sure you want to delete this schedule? This action cannot be undone.");
+        
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                deleteSchedule(currentScheduleName);
+            }
+        });
+    }
+
+    private void showRenameScheduleDialog() {
+        Stage dialog = new Stage();
+        dialog.setTitle("Rename Schedule");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        
+        Schedule current = schedules.get(currentScheduleName);
+        
+        Label nameLabel = new Label("Schedule Name:");
+        TextField nameField = new TextField(current.name);
+        
+        Label descLabel = new Label("Description:");
+        TextField descField = new TextField(current.description);
+        
+        HBox buttons = new HBox(10);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        
+        Button saveButton = new Button("Save");
+        saveButton.setOnAction(e -> {
+            String newName = nameField.getText().trim();
+            if (!newName.isEmpty() && (!schedules.containsKey(newName) || newName.equals(current.name))) {
+                renameSchedule(current.name, newName, descField.getText().trim());
+                dialog.close();
+            }
+        });
+        
+        Button cancelButton = new Button("Cancel");
+        cancelButton.setOnAction(e -> dialog.close());
+        
+        buttons.getChildren().addAll(cancelButton, saveButton);
+        layout.getChildren().addAll(nameLabel, nameField, descLabel, descField, buttons);
+        
+        Scene scene = new Scene(layout, 300, 200);
+        dialog.setScene(scene);
+        dialog.showAndWait();
     }
 
     HBox setPath(Stage stage, Configuration.Path path, String name, String filter)
@@ -764,6 +1173,36 @@ public class CoreApplication extends Application {
             }
         }
         throw new RuntimeException("Unable to resolve scenario file path");
+    }
+
+    private static String getScheduleFilePath() {
+        String appdata = System.getenv("APPDATA");
+        if (appdata != null) {
+            File base = new File(appdata, "Haven and Hearth/data");
+            if (!base.exists()) {
+                base.mkdirs();
+            }
+
+            File parent = base.getParentFile();
+            if (parent != null) {
+                File scheduleFile = new File(parent, "schedules.hhautolauncher.json");
+                return scheduleFile.getAbsolutePath();
+            }
+        }
+
+        String userHome = System.getProperty("user.home");
+        if (userHome != null) {
+            File base = new File(userHome, ".haven/data");
+            if (!base.exists()) {
+                base.mkdirs();
+            }
+            File parent = base.getParentFile();
+            if (parent != null) {
+                File scheduleFile = new File(parent, "schedules.hhautolauncher.json");
+                return scheduleFile.getAbsolutePath();
+            }
+        }
+        throw new RuntimeException("Unable to resolve schedule file path");
     }
 
 

@@ -65,10 +65,15 @@ public class DateTimePicker extends DatePicker {
     }
 
     public void setDateTimeValue(LocalDateTime dateTimeValue) {
-        if(dateTimeValue.isAfter(LocalDateTime.of(1971, 6, 30, 12, 0)))
+        if(dateTimeValue.isAfter(LocalDateTime.of(1971, 6, 30, 12, 0))) {
             this.dateTimeValue.set(dateTimeValue);
-        else
+            getEditor().setText(getConverter().toString(dateTimeValue.toLocalDate()));
+        }
+
+        else {
             this.dateTimeValue.set(null);
+            getEditor().setText("");
+        }
     }
 
     public long getTime(){

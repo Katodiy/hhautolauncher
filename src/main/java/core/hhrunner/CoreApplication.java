@@ -244,6 +244,7 @@ public class CoreApplication extends Application {
         automations.put(res.name,res);
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
+        show(res.name);
         write(AUTOMATIONS_FILE);
     }
 
@@ -252,8 +253,10 @@ public class CoreApplication extends Application {
         automations.put(res.name,res);
         automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
         automationComboBox.getSelectionModel().select(res.name);
+        show(res.name);
         write(AUTOMATIONS_FILE);
     }
+
     public void show(String name){
 
         Automation auto = automations.get(name);
@@ -262,6 +265,13 @@ public class CoreApplication extends Application {
             user.setText(auto.user);
             password.setText(auto.password);
             character.setText(auto.character);
+
+            range.setText(String.valueOf(auto.interval));
+            duration.setText(String.valueOf(auto.duration));
+            disable.setSelected(auto.disabled);
+            isRepeted.setSelected(auto.isRepeted);
+            isStartTime.setSelected(auto.isStartTime);
+            dataPicker.setTime(auto.startTime);
 
             for (Scenario sc : loadedScenarios.values()) {
                 String display = sc.name + " (ID: " + sc.id + ")";
@@ -373,14 +383,6 @@ public class CoreApplication extends Application {
         ObservableList<String> langs = FXCollections.observableArrayList();
         automationComboBox = new ComboBox<String>(langs);
         automationComboBox.setMinWidth(620);
-
-        automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
-        if (!automations.isEmpty()) {
-            for (String key : automations.keySet()) {
-                automationComboBox.getSelectionModel().select(key);
-                break;
-            }
-        }
 
         automationComboBox.valueProperty().addListener(new ChangeListener<String>() {
             @Override public void changed(ObservableValue ov, String t, String t1) {
@@ -585,10 +587,8 @@ public class CoreApplication extends Application {
                 automations.remove(automationComboBox.getSelectionModel().getSelectedItem());
                 if(automations.size()>0){
                     automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
-                    for(String key: automations.keySet()){
-                        automationComboBox.getSelectionModel().select(key);
-                        break;
-                    }
+                    automationComboBox.getSelectionModel().selectFirst();
+                    show(automationComboBox.getSelectionModel().getSelectedItem());
                 }else{
                     clear();
                 }
@@ -671,6 +671,13 @@ public class CoreApplication extends Application {
         stage.setTitle("HH client: Nurgling");
         stage.getIcons().add(new Image(
                         getClass().getResourceAsStream( "/timer.png" )));
+
+        automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        if (!automations.isEmpty()) {
+            automationComboBox.getSelectionModel().selectFirst();
+            show(automationComboBox.getSelectionModel().getSelectedItem());
+        }
+
         stage.setScene(scene);
         stage.show();
     }

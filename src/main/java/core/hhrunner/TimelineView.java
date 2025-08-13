@@ -13,10 +13,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class TimelineView extends VBox {
-    private static final int HOUR_HEIGHT = 30;
+    private static final int INTERVAL_HEIGHT = 20; // Height for each 15-minute interval
     private static final int TASK_WIDTH = 200;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM dd");
+    
+    // Color palette for different tasks
+    private static final String[] TASK_COLORS = {
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", 
+        "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
+        "#F8C471", "#82E0AA", "#F1948A", "#85CDDF", "#D7BDE2"
+    };
+    
+    private Map<String, String> taskColorMap = new HashMap<>();
     
     private VBox timelineContent;
     private ScrollPane scrollPane;
@@ -40,6 +49,7 @@ public class TimelineView extends VBox {
     
     public void updateTimeline(HashMap<String, Automation> automations) {
         timelineContent.getChildren().clear();
+        taskColorMap.clear(); // Reset color assignments
         
         if (automations.isEmpty()) {
             Label emptyLabel = new Label("No tasks scheduled");
@@ -47,6 +57,9 @@ public class TimelineView extends VBox {
             timelineContent.getChildren().add(emptyLabel);
             return;
         }
+        
+        // Assign colors to tasks
+        assignTaskColors(automations);
         
         // Generate timeline for next 24 hours
         LocalDateTime now = LocalDateTime.now();
@@ -67,6 +80,16 @@ public class TimelineView extends VBox {
         
         // Create timeline visualization
         createTimelineGrid(taskRuns, now, endTime);
+    }
+    
+    private void assignTaskColors(HashMap<String, Automation> automations) {
+        int colorIndex = 0;
+        for (String taskName : automations.keySet()) {
+            if (!automations.get(taskName).disabled) {
+                taskColorMap.put(taskName, TASK_COLORS[colorIndex % TASK_COLORS.length]);
+                colorIndex++;
+            }
+        }
     }
     
     private List<TaskRun> calculateTaskRuns(Automation auto, LocalDateTime start, LocalDateTime end) {
@@ -104,71 +127,177 @@ public class TimelineView extends VBox {
     }
     
     private void createTimelineGrid(List<TaskRun> taskRuns, LocalDateTime start, LocalDateTime end) {
-        // Create hour grid
-        LocalDateTime current = start.withMinute(0).withSecond(0);
+        // Create a canvas-like approach with absolute positioning
+        VBox timeGrid = new VBox();
         
-        while (current.isBefore(end) || current.equals(end)) {
-            HBox hourRow = new HBox();
-            hourRow.setSpacing(10);
-            hourRow.setAlignment(Pos.CENTER_LEFT);
-            hourRow.setPrefHeight(HOUR_HEIGHT);
+        // Calculate total height needed
+        long totalMinutes = java.time.Duration.between(start, end).toMinutes();
+        double totalHeight = (totalMinutes / 15.0) * INTERVAL_HEIGHT;
+        
+        // Create the time scale on the left
+        VBox timeScale = new VBox();
+        timeScale.setPrefWidth(60);
+        
+        // Create the task area with absolute positioning
+        Pane taskArea = new Pane();
+        taskArea.setPrefHeight(totalHeight);
+        taskArea.setPrefWidth(600);
+        taskArea.setStyle("-fx-border-color: lightgray; -fx-border-width: 1;");
+        
+        // Draw time labels and grid lines
+        LocalDateTime current = start.withMinute(start.getMinute() / 15 * 15).withSecond(0);
+        double yPos = 0;
+        
+        while (current.isBefore(end)) {
+            // Time labels
+            if (current.getMinute() == 0) {
+                Label timeLabel = new Label(current.format(TIME_FORMAT));
+                timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: black; -fx-font-weight: bold;");
+                timeLabel.setLayoutY(yPos);
+                timeScale.getChildren().add(timeLabel);
+                
+                // Hour separator line
+                javafx.scene.shape.Line line = new javafx.scene.shape.Line();
+                line.setStartX(0);
+                line.setEndX(600);
+                line.setStartY(yPos);
+                line.setEndY(yPos);
+                line.setStroke(Color.LIGHTGRAY);
+                taskArea.getChildren().add(line);
+            } else if (current.getMinute() == 30) {
+                Label timeLabel = new Label(current.format(TIME_FORMAT));
+                timeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: gray;");
+                timeLabel.setLayoutY(yPos);
+                timeScale.getChildren().add(timeLabel);
+            } else {
+                // Add spacer for 15 and 45 minute marks
+                Label spacer = new Label("");
+                spacer.setPrefHeight(INTERVAL_HEIGHT);
+                timeScale.getChildren().add(spacer);
+            }
             
-            // Time label
-            Label timeLabel = new Label(current.format(TIME_FORMAT));
-            timeLabel.setPrefWidth(50);
-            timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: gray;");
+            current = current.plusMinutes(15);
+            yPos += INTERVAL_HEIGHT;
+        }
+        
+        // Draw complete task blocks with proper lane assignment
+        double taskLaneWidth = 150;
+        int maxLanes = 4;
+        
+        // Assign lanes to tasks using proper overlap detection
+        Map<TaskRun, Integer> taskLanes = assignTaskLanes(taskRuns, maxLanes);
+        
+        for (TaskRun run : taskRuns) {
+            // Calculate task position and size
+            double taskStartY = calculateYPosition(run.startTime, start);
+            double taskHeight = java.time.Duration.between(run.startTime, run.endTime).toMinutes() / 15.0 * INTERVAL_HEIGHT;
             
-            // Task area
-            HBox taskArea = new HBox();
-            taskArea.setSpacing(5);
-            taskArea.setPrefHeight(HOUR_HEIGHT - 5);
+            // Get assigned lane
+            int lane = taskLanes.getOrDefault(run, 0);
+            double taskX = lane * (taskLaneWidth + 10);
             
-            // Find tasks that run in this hour
-            LocalDateTime nextHour = current.plusHours(1);
-            for (TaskRun run : taskRuns) {
-                if (run.overlapsHour(current, nextHour)) {
-                    Rectangle taskRect = createTaskRectangle(run, current, nextHour);
-                    Label taskLabel = new Label(run.taskName);
-                    taskLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: white; -fx-font-weight: bold;");
-                    
-                    StackPane taskPane = new StackPane();
-                    taskPane.getChildren().addAll(taskRect, taskLabel);
-                    taskPane.setMaxWidth(TASK_WIDTH);
-                    
-                    taskArea.getChildren().add(taskPane);
+            // Create complete task rectangle
+            Rectangle taskRect = new Rectangle();
+            taskRect.setWidth(taskLaneWidth);
+            taskRect.setHeight(Math.max(taskHeight, INTERVAL_HEIGHT));
+            taskRect.setLayoutX(taskX);
+            taskRect.setLayoutY(taskStartY);
+            
+            // Use assigned task color
+            String taskColor = taskColorMap.get(run.taskName);
+            if (taskColor != null) {
+                taskRect.setFill(Color.web(taskColor));
+            } else {
+                taskRect.setFill(Color.web("#4CAF50"));
+            }
+            taskRect.setArcWidth(5);
+            taskRect.setArcHeight(5);
+            taskRect.setStroke(Color.WHITE);
+            taskRect.setStrokeWidth(1);
+            
+            // Create task label
+            Label taskLabel = new Label(run.taskName + "\n" + 
+                run.startTime.format(TIME_FORMAT) + " - " + run.endTime.format(TIME_FORMAT));
+            taskLabel.setLayoutX(taskX + 5);
+            taskLabel.setLayoutY(taskStartY + 5);
+            taskLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: white; -fx-font-weight: bold;");
+            taskLabel.setMaxWidth(taskLaneWidth - 10);
+            taskLabel.setWrapText(true);
+            
+            taskArea.getChildren().addAll(taskRect, taskLabel);
+        }
+        
+        // Combine time scale and task area
+        HBox timelineLayout = new HBox();
+        timelineLayout.getChildren().addAll(timeScale, taskArea);
+        timelineContent.getChildren().add(timelineLayout);
+    }
+    
+    private double calculateYPosition(LocalDateTime taskTime, LocalDateTime timelineStart) {
+        long minutesFromStart = java.time.Duration.between(timelineStart, taskTime).toMinutes();
+        return (minutesFromStart / 15.0) * INTERVAL_HEIGHT;
+    }
+    
+    private Map<TaskRun, Integer> assignTaskLanes(List<TaskRun> taskRuns, int maxLanes) {
+        Map<TaskRun, Integer> taskLanes = new HashMap<>();
+        
+        // Sort tasks by start time for better lane assignment
+        List<TaskRun> sortedTasks = new ArrayList<>(taskRuns);
+        sortedTasks.sort(Comparator.comparing(task -> task.startTime));
+        
+        // Keep track of when each lane becomes free
+        LocalDateTime[] laneEndTimes = new LocalDateTime[maxLanes];
+        for (int i = 0; i < maxLanes; i++) {
+            laneEndTimes[i] = LocalDateTime.MIN;
+        }
+        
+        for (TaskRun task : sortedTasks) {
+            // Find the first available lane
+            int assignedLane = 0;
+            for (int lane = 0; lane < maxLanes; lane++) {
+                // A lane is available if its last task ended before this task starts
+                if (laneEndTimes[lane].isBefore(task.startTime) || laneEndTimes[lane].equals(task.startTime)) {
+                    assignedLane = lane;
+                    break;
                 }
             }
             
-            hourRow.getChildren().addAll(timeLabel, taskArea);
-            
-            // Add separator line
-            if (current.getHour() % 4 == 0) {
-                hourRow.setStyle("-fx-border-color: lightgray; -fx-border-width: 0 0 1 0;");
-            }
-            
-            timelineContent.getChildren().add(hourRow);
-            current = current.plusHours(1);
+            // Assign the task to the lane and update the lane's end time
+            taskLanes.put(task, assignedLane);
+            laneEndTimes[assignedLane] = task.endTime;
         }
+        
+        return taskLanes;
     }
     
-    private Rectangle createTaskRectangle(TaskRun run, LocalDateTime hourStart, LocalDateTime hourEnd) {
+    private boolean tasksOverlap(TaskRun task1, TaskRun task2) {
+        return task1.startTime.isBefore(task2.endTime) && task2.startTime.isBefore(task1.endTime);
+    }
+    
+    private Rectangle createTaskRectangle(TaskRun run, LocalDateTime intervalStart, LocalDateTime intervalEnd) {
         Rectangle rect = new Rectangle();
-        rect.setHeight(HOUR_HEIGHT - 10);
+        rect.setHeight(INTERVAL_HEIGHT - 4);
         
-        // Calculate width based on overlap with this hour
-        long overlapMinutes = run.getOverlapMinutes(hourStart, hourEnd);
-        double widthRatio = overlapMinutes / 60.0;
-        rect.setWidth(Math.max(80, TASK_WIDTH * widthRatio));
+        // Calculate width based on overlap with this 15-minute interval
+        long overlapMinutes = run.getOverlapMinutes(intervalStart, intervalEnd);
+        double widthRatio = overlapMinutes / 15.0; // 15-minute intervals
+        rect.setWidth(Math.max(60, TASK_WIDTH * widthRatio));
         
-        // Color based on task type
-        if (run.isRepeating) {
-            rect.setFill(Color.web("#4CAF50")); // Green for repeating tasks
+        // Use assigned task color
+        String taskColor = taskColorMap.get(run.taskName);
+        if (taskColor != null) {
+            rect.setFill(Color.web(taskColor));
         } else {
-            rect.setFill(Color.web("#2196F3")); // Blue for one-time tasks
+            // Fallback colors based on task type
+            if (run.isRepeating) {
+                rect.setFill(Color.web("#4CAF50")); // Green for repeating tasks
+            } else {
+                rect.setFill(Color.web("#2196F3")); // Blue for one-time tasks
+            }
         }
         
-        rect.setArcWidth(5);
-        rect.setArcHeight(5);
+        rect.setArcWidth(3);
+        rect.setArcHeight(3);
         
         return rect;
     }
@@ -187,8 +316,13 @@ public class TimelineView extends VBox {
             this.isRepeating = isRepeating;
         }
         
+        boolean overlapsInterval(LocalDateTime intervalStart, LocalDateTime intervalEnd) {
+            return startTime.isBefore(intervalEnd) && endTime.isAfter(intervalStart);
+        }
+        
+        // Keep the old method for backward compatibility
         boolean overlapsHour(LocalDateTime hourStart, LocalDateTime hourEnd) {
-            return startTime.isBefore(hourEnd) && endTime.isAfter(hourStart);
+            return overlapsInterval(hourStart, hourEnd);
         }
         
         long getOverlapMinutes(LocalDateTime hourStart, LocalDateTime hourEnd) {

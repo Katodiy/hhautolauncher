@@ -1015,6 +1015,8 @@ public class CoreApplication extends Application {
         });
 
         table.getColumns().addAll(name, start, stop, status, pauseCol);
+        table.setPrefHeight(200);
+        table.setMaxHeight(200);
 
         mainlayout.getChildren().add(table);
 

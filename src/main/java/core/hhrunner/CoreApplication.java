@@ -54,6 +54,7 @@ public class CoreApplication extends Application {
 
     Button nomadSelect;
     Button startb;
+    Button pauseAllb;
     Button stopb;
 
     ListView<String> list;
@@ -1021,12 +1022,39 @@ public class CoreApplication extends Application {
                     scenarioBox.setDisable(true);
                     startb.setDisable(true);
                     titleBox.setDisable(true);
+                    pauseAllb.setDisable(false);
                     stopb.setDisable(false);
                 }
 
             }
         });
-        stopb = new Button("Stop all");
+        
+        pauseAllb = new Button("Pause All");
+        pauseAllb.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                if (pauseAllb.getText().equals("Pause All")) {
+                    // Pause all running tasks indefinitely
+                    for (Task task : table.getItems()) {
+                        if (!task.isPaused()) {
+                            task.pauseIndefinitely();
+                        }
+                    }
+                    pauseAllb.setText("Resume All");
+                } else {
+                    // Resume all paused tasks
+                    for (Task task : table.getItems()) {
+                        if (task.isPaused()) {
+                            task.resume();
+                        }
+                    }
+                    pauseAllb.setText("Pause All");
+                }
+                table.refresh();
+            }
+        });
+        
+        stopb = new Button("Stop All");
         stopb.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
@@ -1034,6 +1062,8 @@ public class CoreApplication extends Application {
                         scenarioBox.setDisable(false);
                         startb.setDisable(false);
                         titleBox.setDisable(false);
+                        pauseAllb.setDisable(true);
+                        pauseAllb.setText("Pause All"); // Reset button text
                         stopb.setDisable(true);
                         isWork.set(false);
                         try {
@@ -1045,8 +1075,10 @@ public class CoreApplication extends Application {
             }
         });
         stopb.setDisable(true);
+        pauseAllb.setDisable(true);
         mainButton.setAlignment(Pos.CENTER_RIGHT);
         mainButton.getChildren().add(startb);
+        mainButton.getChildren().add(pauseAllb);
         mainButton.getChildren().add(stopb);
 
         mainlayout.getChildren().add(mainButton);

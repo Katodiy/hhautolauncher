@@ -99,7 +99,23 @@ public class CoreApplication extends Application {
             long time = System.currentTimeMillis();
             for(String key : automations.keySet()){
                 Automation auto = automations.get(key);
-                tasks.add(new Task((auto.isStartTime) ? auto.startTime : time, auto));
+                long startTime = time; // Default to current time
+                
+                if (auto.isStartTime) {
+                    // If the specified start time is in the future, use it
+                    if (auto.startTime > time || !auto.isRepeted) {
+                        startTime = auto.startTime;
+                    } else if (auto.isRepeted) {
+                        // If start time is in the past and task repeats, calculate next occurrence
+                        long intervalMs = (long) auto.interval * 60 * 1000;
+                        long timeSinceStart = time - auto.startTime;
+                        long missedIntervals = timeSinceStart / intervalMs;
+                        startTime = auto.startTime + (missedIntervals + 1) * intervalMs;
+                    }
+                    // If start time is in the past and task doesn't repeat, use current time
+                }
+                
+                tasks.add(new Task(startTime, auto));
             }
             table.setItems( FXCollections.observableArrayList(tasks));
             isWork.set(true);
@@ -124,8 +140,11 @@ public class CoreApplication extends Application {
                     }else if (task.isWork() && task.stop<=time){
                         task.stopProcess();
                         forDelete.add(task);
-                        if(task.automation.isRepeted)
-                            forAdding.add(new Task(task.start+ (long) task.automation.interval *60*1000,task.automation));
+                        if(task.automation.isRepeted) {
+                            // Calculate next start time from current time + interval to avoid past scheduling
+                            long nextStartTime = time + (long) task.automation.interval * 60 * 1000;
+                            forAdding.add(new Task(nextStartTime, task.automation));
+                        }
                     }
                 }
                 for(Task task: forDelete){

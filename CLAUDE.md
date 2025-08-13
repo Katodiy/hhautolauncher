@@ -50,6 +50,7 @@ This is a Gradle-based Java project with JavaFX dependencies.
 - **Migration Support**: Existing `automations.json` files are automatically migrated to a "Default Schedule"
 - **Schedule Operations**: Create new schedules, switch between them, rename, and delete via GUI
 - **Cross-Platform Storage**: Uses Windows APPDATA or Unix home directory following Haven and Hearth conventions
+- **Smart Start Time Handling**: Past start times are automatically adjusted to prevent rapid catch-up execution when restarting schedules
 
 ### Data Persistence
 - **`schedules.hhautolauncher.json`**: Stores named schedules containing automation collections in app data directory

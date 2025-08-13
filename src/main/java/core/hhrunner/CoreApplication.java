@@ -135,10 +135,25 @@ public class CoreApplication extends Application {
                 ArrayList<Task> forAdding = new ArrayList<>();
                 for(Task task: tasks){
                     if(!task.isWork() && task.start<=time && !task.isPaused()){
-                        try {
-                            task.startProcess(Configuration.getInstance().hafenPath.value);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
+                        // Check if another task with the same username is already running
+                        boolean canStart = true;
+                        for (Task runningTask : tasks) {
+                            if (runningTask != task && runningTask.isWork() && 
+                                task.automation.user.equals(runningTask.automation.user)) {
+                                // Same username is already running, delay this task
+                                task.start = Math.max(task.start, runningTask.stop);
+                                task.stop = task.start + ((long) task.automation.duration * 60 * 1000);
+                                canStart = false;
+                                break;
+                            }
+                        }
+                        
+                        if (canStart) {
+                            try {
+                                task.startProcess(Configuration.getInstance().hafenPath.value);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
                         }
                     }else if (task.isWork() && task.stop<=time){
                         task.stopProcess();

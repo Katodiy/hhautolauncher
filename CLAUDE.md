@@ -51,6 +51,7 @@ This is a Gradle-based Java project with JavaFX dependencies.
 - **Schedule Operations**: Create new schedules, switch between them, rename, and delete via GUI
 - **Cross-Platform Storage**: Uses Windows APPDATA or Unix home directory following Haven and Hearth conventions
 - **Smart Start Time Handling**: Past start times are automatically adjusted to prevent rapid catch-up execution when restarting schedules
+- **Individual Task Pause Control**: Users can pause specific tasks for a custom duration (in minutes) while other tasks continue running
 
 ### Data Persistence
 - **`schedules.hhautolauncher.json`**: Stores named schedules containing automation collections in app data directory
@@ -82,7 +83,9 @@ The project includes a custom JSON library in the `json` package (not using exte
 
 ### GUI Considerations
 - Single-window JavaFX application with embedded table for task monitoring
-- Real-time task status updates displayed in TableView
+- Real-time task status updates displayed in TableView with pause/resume controls
+- Individual task pause functionality with custom duration input (defaults to 30 minutes)
+- Live countdown display showing remaining pause time for each task
 - Modal configuration dialog for setting Java and Hafen paths
 - File choosers for selecting executables and data files
 

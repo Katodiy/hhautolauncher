@@ -131,7 +131,7 @@ public class CoreApplication extends Application {
                 ArrayList<Task> forDelete = new ArrayList<>();
                 ArrayList<Task> forAdding = new ArrayList<>();
                 for(Task task: tasks){
-                    if(!task.isWork() && task.start<=time){
+                    if(!task.isWork() && task.start<=time && !task.isPaused()){
                         try {
                             task.startProcess(Configuration.getInstance().hafenPath.value);
                         } catch (IOException e) {
@@ -153,6 +153,9 @@ public class CoreApplication extends Application {
                 tasks.addAll(forAdding);
                 if(!forDelete.isEmpty() || !forAdding.isEmpty()){
                     table.setItems( FXCollections.observableArrayList(tasks));
+                } else {
+                    // Refresh table periodically to update pause status display
+                    table.refresh();
                 }
                 try {
                     Thread.sleep(1000);
@@ -663,7 +666,7 @@ public class CoreApplication extends Application {
 
         ObservableList<String> langs = FXCollections.observableArrayList();
         automationComboBox = new ComboBox<String>(langs);
-        automationComboBox.setMinWidth(620);
+        automationComboBox.setMaxWidth(Double.MAX_VALUE);
 
         automationComboBox.valueProperty().addListener(new ChangeListener<String>() {
             @Override public void changed(ObservableValue ov, String t, String t1) {
@@ -690,7 +693,7 @@ public class CoreApplication extends Application {
         scheduleSelectionBox.getChildren().add(new Label("Schedule:"));
         
         scheduleComboBox = new ComboBox<>();
-        scheduleComboBox.setMinWidth(300);
+        scheduleComboBox.setMaxWidth(Double.MAX_VALUE);
         scheduleComboBox.valueProperty().addListener(new ChangeListener<String>() {
             @Override
             public void changed(ObservableValue ov, String oldValue, String newValue) {
@@ -700,6 +703,7 @@ public class CoreApplication extends Application {
             }
         });
         scheduleSelectionBox.getChildren().add(scheduleComboBox);
+        VBox.setVgrow(scheduleComboBox, Priority.ALWAYS);
         
         VBox scheduleButtonsBox = new VBox();
         scheduleButtonsBox.setSpacing(3);
@@ -724,62 +728,67 @@ public class CoreApplication extends Application {
         scheduleButtonsBox.getChildren().add(scheduleButtons);
         
         scheduleSection.getChildren().addAll(scheduleSelectionBox, scheduleButtonsBox);
+        HBox.setHgrow(scheduleSelectionBox, Priority.ALWAYS);
         centrallayout.getChildren().add(scheduleSection);
         
-        // Separator
-        centrallayout.getChildren().add(new Label(""));
-        
         centrallayout.getChildren().add(new Label("Task:"));
-        centrallayout.getChildren().add(automationComboBox);
+        HBox taskBox = new HBox();
+        taskBox.getChildren().add(automationComboBox);
+        HBox.setHgrow(automationComboBox, Priority.ALWAYS);
+        centrallayout.getChildren().add(taskBox);
 
         /// Слой заголовка
         HBox titleBox  = new HBox();
         titleBox.getChildren().add(new Label("Automation name"));
         title = new TextField();
-        titleBox.setSpacing(100);
+        titleBox.setSpacing(30);
         titleBox.setAlignment(Pos.CENTER_RIGHT);
         HBox.setHgrow(title, Priority.ALWAYS);
         HBox.setMargin(title, new Insets(5,5,0,0));
         titleBox.getChildren().add(title);
-        titleBox.setMinWidth(620);
+        titleBox.setMinWidth(630);
         centrallayout.getChildren().add(titleBox);
 
         /// Слой параметров
         VBox propBox = new VBox();
-        propBox.setMinWidth(365);
+        propBox.setMinWidth(350);
+        propBox.setPrefWidth(350);
         propBox.setSpacing(7);
         disable = new CheckBox("Disable");
         propBox.getChildren().add(disable);
 
         HBox userBox  = new HBox();
-        userBox.getChildren().add(new Label("User"));
+        userBox.setSpacing(10);
+        Label userLabel = new Label("User");
+        userLabel.setPrefWidth(120);
+        userBox.getChildren().add(userLabel);
         user = new TextField();
         user.setPrefWidth(200);
-        Region filleru = new Region();
-        HBox.setHgrow(filleru, Priority.ALWAYS);
-        userBox.getChildren().add(filleru);
         userBox.getChildren().add(user);
 
         HBox passwordBox  = new HBox();
-        passwordBox.getChildren().add(new Label("Password"));
+        passwordBox.setSpacing(10);
+        Label passwordLabel = new Label("Password");
+        passwordLabel.setPrefWidth(120);
+        passwordBox.getChildren().add(passwordLabel);
         password = new PasswordField();
         password.setPrefWidth(200);
-        Region fillerp = new Region();
-        HBox.setHgrow(fillerp, Priority.ALWAYS);
-        passwordBox.getChildren().add(fillerp);
         passwordBox.getChildren().add(password);
 
         HBox characterBox  = new HBox();
-        characterBox.getChildren().add(new Label("Character"));
+        characterBox.setSpacing(10);
+        Label characterLabel = new Label("Character");
+        characterLabel.setPrefWidth(120);
+        characterBox.getChildren().add(characterLabel);
         character = new TextField();
         character.setPrefWidth(200);
-        Region fillerc = new Region();
-        HBox.setHgrow(fillerc, Priority.ALWAYS);
-        characterBox.getChildren().add(fillerc);
         characterBox.getChildren().add(character);
 
         HBox rangeBox  = new HBox();
-        rangeBox.getChildren().add(new Label("Time interval(min)"));
+        rangeBox.setSpacing(10);
+        Label rangeLabel = new Label("Time interval(min)");
+        rangeLabel.setPrefWidth(120);
+        rangeBox.getChildren().add(rangeLabel);
         range = new TextField();
         range.textProperty().addListener(new ChangeListener<String>() {
             @Override
@@ -792,13 +801,13 @@ public class CoreApplication extends Application {
         });
         range.setPrefWidth(200);
         range.setText("0");
-        Region fillerr = new Region();
-        HBox.setHgrow(fillerr, Priority.ALWAYS);
-        rangeBox.getChildren().add(fillerr);
         rangeBox.getChildren().add(range);
 
         HBox durationBox  = new HBox();
-        durationBox.getChildren().add(new Label("Duration(min.)"));
+        durationBox.setSpacing(10);
+        Label durationLabel = new Label("Duration(min.)");
+        durationLabel.setPrefWidth(120);
+        durationBox.getChildren().add(durationLabel);
         duration = new TextField();
         duration.textProperty().addListener(new ChangeListener<String>() {
             @Override
@@ -812,9 +821,6 @@ public class CoreApplication extends Application {
 
         duration.setPrefWidth(200);
         duration.setText("0");
-        Region fillerd = new Region();
-        HBox.setHgrow(fillerd, Priority.ALWAYS);
-        durationBox.getChildren().add(fillerd);
         durationBox.getChildren().add(duration);
 
         propBox.getChildren().add(userBox);
@@ -841,43 +847,17 @@ public class CoreApplication extends Application {
         dataPicker.setMinWidth(200);
 
         isStartTime = new CheckBox("Start time(opt)");
+        isStartTime.setPrefWidth(120);
         HBox timeBox = new HBox();
+        timeBox.setSpacing(10);
+        timeBox.setPrefWidth(120);
         timeBox.getChildren().add(isStartTime);
-        Region fillert = new Region();
-        HBox.setHgrow(fillert, Priority.ALWAYS);
-        timeBox.getChildren().add(fillert);
         timeBox.getChildren().add(dataPicker);
         propBox.getChildren().add(timeBox);
 
-
-        HBox nomadBox  = new HBox();
-        nomadBox.getChildren().add(new Label("Nomad file(opt)"));
-        nomadPath = new TextField();
-        nomadPath.setPrefWidth(176);
-        Region fillern = new Region();
-        HBox.setHgrow(fillern, Priority.ALWAYS);
-        nomadBox.getChildren().add(fillern);
-        nomadBox.getChildren().add(nomadPath);
-        nomadSelect = new Button("...");
-        nomadSelect.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-                FileChooser fileChooser = new FileChooser();
-                FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("Nomad files (*.DAT)", "*.dat");
-                fileChooser.getExtensionFilters().add(extFilter);
-                fileChooser.setTitle("Select *.dat file");
-                File file = fileChooser.showOpenDialog(stage);
-                if(file!=null && file.exists()) {
-                    nomadPath.setText(file.getPath());
-                }
-            }
-        });
-        nomadBox.getChildren().add(nomadSelect);
-
-        propBox.getChildren().add(nomadBox);
-
         HBox scenarioBox = new HBox();
-        scenarioBox.setSpacing(7);
+        scenarioBox.setSpacing(15);
+        scenarioBox.setAlignment(Pos.CENTER_LEFT);
         scenarioBox.getChildren().add(propBox);
 
         ObservableList<String> scenarioNames = loadScenariosFromNurglingFile();
@@ -886,9 +866,10 @@ public class CoreApplication extends Application {
         scenarioPicker = new ListView<>(scenarioNames);
         ObservableList<String> items = loadScenariosFromNurglingFile();
         scenarioPicker.setItems(items);
-        scenarioPicker.setMinWidth(300);
-        scenarioPicker.setMinHeight(320);
-        scenarioPicker.setMaxHeight(390);
+        scenarioPicker.setMinWidth(200);
+        scenarioPicker.setPrefWidth(200);
+        scenarioPicker.setMinHeight(300);
+        scenarioPicker.setMaxHeight(350);
         rightBox.getChildren().add(new Label("Available scenarios:"));
         rightBox.getChildren().add(scenarioPicker);
         rightBox.setSpacing(7);
@@ -940,18 +921,72 @@ public class CoreApplication extends Application {
         table = new TableView<>();
         table.setEditable(true);
         TableColumn<Task, String> name = new TableColumn<Task, String>("Name");
-        name.setMinWidth(214);
+        name.setMinWidth(120);
+        name.setPrefWidth(120);
         TableColumn<Task, String> start = new TableColumn<Task, String>("Start time");
-        start.setMinWidth(212);
+        start.setMinWidth(150);
+        start.setPrefWidth(150);
         TableColumn<Task, String> stop = new TableColumn<Task, String>("End time");
-        stop.setMinWidth(212);
+        stop.setMinWidth(150);
+        stop.setPrefWidth(150);
+        TableColumn<Task, String> status = new TableColumn<Task, String>("Status");
+        status.setMinWidth(140);
+        status.setPrefWidth(140);
+        TableColumn<Task, Void> pauseCol = new TableColumn<Task, Void>("Pause");
+        pauseCol.setMinWidth(160);
+        pauseCol.setPrefWidth(160);
+        
         name.setCellValueFactory(new PropertyValueFactory<>("name"));
         start.setCellValueFactory(new PropertyValueFactory<>("start"));
         stop.setCellValueFactory(new PropertyValueFactory<>("stop"));
-//        emailCol.setCellValueFactory(new PropertyValueFactory<>("email"));
-//        firstNameCol.setCellValueFactory(new PropertyValueFactory<>("firstName"));
+        status.setCellValueFactory(new PropertyValueFactory<>("pauseStatus"));
+        
+        pauseCol.setCellFactory(col -> new TableCell<Task, Void>() {
+            private final Button pauseButton = new Button("Pause");
+            private final TextField minutesField = new TextField("30");
+            private final HBox buttonBox = new HBox(5);
+            
+            {
+                minutesField.setPrefWidth(35);
+                minutesField.setPromptText("min");
+                pauseButton.setPrefWidth(60);
+                pauseButton.setOnAction(e -> {
+                    Task task = getTableView().getItems().get(getIndex());
+                    if (task != null) {
+                        try {
+                            int minutes = Integer.parseInt(minutesField.getText());
+                            if (task.isPaused()) {
+                                task.resume();
+                            } else {
+                                task.pauseForMinutes(minutes);
+                            }
+                            getTableView().refresh();
+                        } catch (NumberFormatException ex) {
+                            // Invalid number, ignore
+                        }
+                    }
+                });
+                buttonBox.setAlignment(Pos.CENTER);
+                buttonBox.getChildren().addAll(minutesField, pauseButton);
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    Task task = getTableView().getItems().get(getIndex());
+                    if (task != null) {
+                        pauseButton.setText(task.isPaused() ? "Resume" : "Pause");
+                        minutesField.setVisible(!task.isPaused());
+                    }
+                    setGraphic(buttonBox);
+                }
+            }
+        });
 
-        table.getColumns().addAll(name, start, stop);
+        table.getColumns().addAll(name, start, stop, status, pauseCol);
 
         mainlayout.getChildren().add(table);
 
@@ -996,9 +1031,9 @@ public class CoreApplication extends Application {
         mainButton.getChildren().add(stopb);
 
         mainlayout.getChildren().add(mainButton);
-        Scene scene = new Scene(mainlayout, 640, 720);
-        stage.setMaxWidth(660);
-        stage.setMinWidth(660);
+        Scene scene = new Scene(mainlayout, 680, 720);
+        stage.setMaxWidth(700);
+        stage.setMinWidth(700);
         stage.setTitle("HH client: Nurgling");
         stage.getIcons().add(new Image(
                         getClass().getResourceAsStream( "/timer.png" )));

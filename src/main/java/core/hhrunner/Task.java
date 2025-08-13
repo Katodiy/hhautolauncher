@@ -28,6 +28,7 @@ public class Task {
     Process p = null;
     public long start;
     public long stop;
+    public long pausedUntil = 0; // timestamp when pause expires, 0 = not paused
     File bot_config;
 
     public Task(long start, Automation automation) {
@@ -39,6 +40,30 @@ public class Task {
 
     public boolean isWork(){
         return p!=null;
+    }
+
+    public boolean isPaused() {
+        return pausedUntil > System.currentTimeMillis();
+    }
+
+    public void pauseForMinutes(int minutes) {
+        pausedUntil = System.currentTimeMillis() + (minutes * 60 * 1000L);
+    }
+
+    public void resume() {
+        pausedUntil = 0;
+    }
+
+    public String getPauseStatus() {
+        if (pausedUntil == 0) {
+            return "Active";
+        }
+        long remaining = pausedUntil - System.currentTimeMillis();
+        if (remaining <= 0) {
+            return "Active";
+        }
+        long remainingMinutes = remaining / (60 * 1000);
+        return "Paused (" + remainingMinutes + "m left)";
     }
 
     public void startProcess(String path) throws IOException {

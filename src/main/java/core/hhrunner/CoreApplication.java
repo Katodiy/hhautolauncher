@@ -89,6 +89,7 @@ public class CoreApplication extends Application {
     Button saveScheduleButton;
     Button deleteScheduleButton;
     Button renameScheduleButton;
+    TimelineView timelineView;
 
     public AtomicBoolean isWork = new AtomicBoolean(false);
     Thread th = null;
@@ -435,6 +436,7 @@ public class CoreApplication extends Application {
         automationComboBox.getSelectionModel().select(res.name);
         show(res.name);
         saveSchedules();
+        refreshTimeline();
     }
 
     public void save(){
@@ -444,6 +446,7 @@ public class CoreApplication extends Application {
         automationComboBox.getSelectionModel().select(res.name);
         show(res.name);
         saveSchedules();
+        refreshTimeline();
     }
 
     public void createNewSchedule(String name, String description) {
@@ -479,6 +482,7 @@ public class CoreApplication extends Application {
             clear();
         }
         saveSchedules();
+        refreshTimeline();
     }
 
     public void deleteSchedule(String scheduleName) {
@@ -535,6 +539,12 @@ public class CoreApplication extends Application {
     private void refreshAutomationComboBox() {
         if (automationComboBox != null) {
             automationComboBox.setItems(FXCollections.observableArrayList(automations.keySet()));
+        }
+    }
+    
+    private void refreshTimeline() {
+        if (timelineView != null) {
+            timelineView.updateTimeline(automations);
         }
     }
 
@@ -680,7 +690,8 @@ public class CoreApplication extends Application {
         VBox mainlayout = new VBox(menuBar);
         /// Основной слой
         VBox centrallayout = new VBox();
-        VBox.setMargin(centrallayout, new Insets(5,5,5,10));
+        VBox.setMargin(centrallayout, new Insets(5,15,5,15));
+        centrallayout.setPadding(new Insets(0,10,0,10));
         centrallayout.setSpacing(5);
         
         // Schedule management section
@@ -905,6 +916,7 @@ public class CoreApplication extends Application {
                     clear();
                 }
                 saveSchedules();
+                refreshTimeline();
             }
         });
         HBox.setHgrow(buttonBox, Priority.ALWAYS);
@@ -917,7 +929,23 @@ public class CoreApplication extends Application {
         centrallayout.getChildren().add(scenarioBox);
         centrallayout.getChildren().add(buttonBox);
 
-        mainlayout.getChildren().add(centrallayout);
+        // Create timeline view
+        timelineView = new TimelineView();
+        
+        // Create tab pane for configuration and timeline
+        TabPane tabPane = new TabPane();
+        
+        Tab configTab = new Tab("Configuration");
+        configTab.setClosable(false);
+        configTab.setContent(centrallayout);
+        
+        Tab timelineTab = new Tab("Timeline");
+        timelineTab.setClosable(false);
+        timelineTab.setContent(timelineView);
+        
+        tabPane.getTabs().addAll(configTab, timelineTab);
+        
+        mainlayout.getChildren().add(tabPane);
         table = new TableView<>();
         table.setEditable(true);
         TableColumn<Task, String> name = new TableColumn<Task, String>("Name");
@@ -1045,6 +1073,9 @@ public class CoreApplication extends Application {
             automationComboBox.getSelectionModel().selectFirst();
             show(automationComboBox.getSelectionModel().getSelectedItem());
         }
+        
+        // Initialize timeline
+        refreshTimeline();
 
         stage.setScene(scene);
         stage.show();

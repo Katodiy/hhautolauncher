@@ -43,11 +43,19 @@ public class Task {
     }
 
     public boolean isPaused() {
-        return pausedUntil > System.currentTimeMillis();
+        return pausedUntil == Long.MAX_VALUE || pausedUntil > System.currentTimeMillis();
     }
 
     public void pauseForMinutes(int minutes) {
-        pausedUntil = System.currentTimeMillis() + (minutes * 60 * 1000L);
+        if (minutes <= 0) {
+            pauseIndefinitely();
+        } else {
+            pausedUntil = System.currentTimeMillis() + (minutes * 60 * 1000L);
+        }
+    }
+    
+    public void pauseIndefinitely() {
+        pausedUntil = Long.MAX_VALUE;
     }
 
     public void resume() {
@@ -57,6 +65,9 @@ public class Task {
     public String getPauseStatus() {
         if (pausedUntil == 0) {
             return "Active";
+        }
+        if (pausedUntil == Long.MAX_VALUE) {
+            return "Paused (indefinitely)";
         }
         long remaining = pausedUntil - System.currentTimeMillis();
         if (remaining <= 0) {

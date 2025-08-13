@@ -90,6 +90,7 @@ public class CoreApplication extends Application {
     Button deleteScheduleButton;
     Button renameScheduleButton;
     TimelineView timelineView;
+    
 
     public AtomicBoolean isWork = new AtomicBoolean(false);
     Thread th = null;
@@ -879,8 +880,8 @@ public class CoreApplication extends Application {
         scenarioPicker.setItems(items);
         scenarioPicker.setMinWidth(290);
         scenarioPicker.setPrefWidth(290);
-        scenarioPicker.setMinHeight(300);
-        scenarioPicker.setMaxHeight(350);
+        scenarioPicker.setMinHeight(250);
+        scenarioPicker.setMaxHeight(250);
         rightBox.getChildren().add(new Label("Available scenarios:"));
         rightBox.getChildren().add(scenarioPicker);
         rightBox.setSpacing(7);
@@ -934,10 +935,20 @@ public class CoreApplication extends Application {
         
         // Create tab pane for configuration and timeline
         TabPane tabPane = new TabPane();
+        tabPane.setMinHeight(Region.USE_COMPUTED_SIZE);
+        tabPane.setMaxHeight(Region.USE_COMPUTED_SIZE);
         
         Tab configTab = new Tab("Configuration");
         configTab.setClosable(false);
-        configTab.setContent(centrallayout);
+        
+        // Wrap centrallayout in a ScrollPane to handle overflow
+        ScrollPane configScrollPane = new ScrollPane(centrallayout);
+        configScrollPane.setFitToWidth(true);
+        configScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        configScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        configScrollPane.setMinHeight(620); // Ensure minimum height for all content
+        
+        configTab.setContent(configScrollPane);
         
         Tab timelineTab = new Tab("Timeline");
         timelineTab.setClosable(false);
@@ -960,9 +971,9 @@ public class CoreApplication extends Application {
         TableColumn<Task, String> status = new TableColumn<Task, String>("Status");
         status.setMinWidth(120);
         status.setPrefWidth(120);
-        TableColumn<Task, Void> pauseCol = new TableColumn<Task, Void>("Pause");
-        pauseCol.setMinWidth(140);
-        pauseCol.setPrefWidth(140);
+        TableColumn<Task, Void> pauseCol = new TableColumn<Task, Void>("Pause Control");
+        pauseCol.setMinWidth(100);
+        pauseCol.setPrefWidth(100);
         
         name.setCellValueFactory(new PropertyValueFactory<>("name"));
         start.setCellValueFactory(new PropertyValueFactory<>("start"));
@@ -970,32 +981,15 @@ public class CoreApplication extends Application {
         status.setCellValueFactory(new PropertyValueFactory<>("pauseStatus"));
         
         pauseCol.setCellFactory(col -> new TableCell<Task, Void>() {
-            private final Button pauseButton = new Button("Pause");
-            private final TextField minutesField = new TextField("30");
-            private final HBox buttonBox = new HBox(5);
+            private final Button controlButton = new Button("Control");
             
             {
-                minutesField.setPrefWidth(35);
-                minutesField.setPromptText("min");
-                pauseButton.setPrefWidth(60);
-                pauseButton.setOnAction(e -> {
+                controlButton.setOnAction(e -> {
                     Task task = getTableView().getItems().get(getIndex());
                     if (task != null) {
-                        try {
-                            int minutes = Integer.parseInt(minutesField.getText());
-                            if (task.isPaused()) {
-                                task.resume();
-                            } else {
-                                task.pauseForMinutes(minutes);
-                            }
-                            getTableView().refresh();
-                        } catch (NumberFormatException ex) {
-                            // Invalid number, ignore
-                        }
+                        showPauseControlDialog(task);
                     }
                 });
-                buttonBox.setAlignment(Pos.CENTER);
-                buttonBox.getChildren().addAll(minutesField, pauseButton);
             }
             
             @Override
@@ -1004,19 +998,14 @@ public class CoreApplication extends Application {
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    Task task = getTableView().getItems().get(getIndex());
-                    if (task != null) {
-                        pauseButton.setText(task.isPaused() ? "Resume" : "Pause");
-                        minutesField.setVisible(!task.isPaused());
-                    }
-                    setGraphic(buttonBox);
+                    setGraphic(controlButton);
                 }
             }
         });
 
         table.getColumns().addAll(name, start, stop, status, pauseCol);
-        table.setPrefHeight(200);
-        table.setMaxHeight(200);
+        table.setPrefHeight(340);
+        table.setMaxHeight(340);
 
         mainlayout.getChildren().add(table);
 
@@ -1292,6 +1281,178 @@ public class CoreApplication extends Application {
         throw new RuntimeException("Unable to resolve schedule file path");
     }
 
+    private void showPauseControlDialog(Task task) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Pause Control - " + task.getName());
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(15);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+        
+        // Task info
+        Label taskInfo = new Label("Task: " + task.getName());
+        taskInfo.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+        
+        Label statusLabel = new Label("Current Status: " + task.getPauseStatus());
+        statusLabel.setStyle("-fx-font-size: 12px;");
+        
+        // Timing information
+        VBox timingInfo = new VBox(5);
+        timingInfo.setAlignment(Pos.CENTER);
+        timingInfo.setStyle("-fx-background-color: #f0f0f0; -fx-padding: 10; -fx-border-color: #ccc; -fx-border-width: 1;");
+        
+        long currentTime = System.currentTimeMillis();
+        java.text.SimpleDateFormat timeFormat = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        
+        Label currentTimeLabel = new Label("Current Time: " + timeFormat.format(new java.util.Date(currentTime)));
+        currentTimeLabel.setStyle("-fx-font-size: 11px;");
+        
+        // Calculate next run time
+        long nextRunTime = calculateNextRunTime(task);
+        Label nextRunLabel;
+        Label timeUntilLabel;
+        
+        if (nextRunTime > 0) {
+            nextRunLabel = new Label("Next Run: " + timeFormat.format(new java.util.Date(nextRunTime)));
+            nextRunLabel.setStyle("-fx-font-size: 11px;");
+            
+            long timeUntil = nextRunTime - currentTime;
+            String timeUntilText = formatDuration(timeUntil);
+            timeUntilLabel = new Label("Time Until Next Run: " + timeUntilText);
+            timeUntilLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold;");
+        } else {
+            nextRunLabel = new Label("Next Run: Task completed or not repeating");
+            nextRunLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+            timeUntilLabel = new Label("Time Until Next Run: N/A");
+            timeUntilLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: gray;");
+        }
+        
+        timingInfo.getChildren().addAll(currentTimeLabel, nextRunLabel, timeUntilLabel);
+        
+        // Pause controls (only show if not currently paused)
+        VBox pauseControls = new VBox(10);
+        pauseControls.setAlignment(Pos.CENTER);
+        
+        if (!task.isPaused()) {
+            Label minutesLabel = new Label("Pause Duration:");
+            TextField minutesField = new TextField("30");
+            minutesField.setPrefWidth(100);
+            minutesField.setPromptText("Minutes");
+            
+            CheckBox indefiniteCheck = new CheckBox("Pause indefinitely");
+            indefiniteCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                minutesField.setDisable(newVal);
+                if (newVal) {
+                    minutesField.setPromptText("Indefinite");
+                } else {
+                    minutesField.setPromptText("Minutes");
+                }
+            });
+            
+            HBox buttonBox = new HBox(10);
+            buttonBox.setAlignment(Pos.CENTER);
+            
+            Button pauseButton = new Button("Pause Task");
+            pauseButton.setPrefWidth(100);
+            pauseButton.setOnAction(e -> {
+                if (indefiniteCheck.isSelected()) {
+                    task.pauseIndefinitely();
+                } else {
+                    try {
+                        int minutes = Integer.parseInt(minutesField.getText());
+                        task.pauseForMinutes(minutes);
+                    } catch (NumberFormatException ex) {
+                        task.pauseForMinutes(30);
+                    }
+                }
+                table.refresh();
+                dialog.close();
+            });
+            
+            Button cancelButton = new Button("Cancel");
+            cancelButton.setPrefWidth(100);
+            cancelButton.setOnAction(e -> dialog.close());
+            
+            buttonBox.getChildren().addAll(pauseButton, cancelButton);
+            pauseControls.getChildren().addAll(minutesLabel, minutesField, indefiniteCheck, buttonBox);
+        } else {
+            // Show resume option if currently paused
+            Button resumeButton = new Button("Resume Task");
+            resumeButton.setPrefWidth(120);
+            resumeButton.setOnAction(e -> {
+                task.resume();
+                table.refresh();
+                dialog.close();
+            });
+            
+            Button cancelButton = new Button("Cancel");
+            cancelButton.setPrefWidth(120);
+            cancelButton.setOnAction(e -> dialog.close());
+            
+            HBox buttonBox = new HBox(10);
+            buttonBox.setAlignment(Pos.CENTER);
+            buttonBox.getChildren().addAll(resumeButton, cancelButton);
+            pauseControls.getChildren().add(buttonBox);
+        }
+        
+        layout.getChildren().addAll(taskInfo, statusLabel, timingInfo, pauseControls);
+        
+        Scene scene = new Scene(layout, 350, 350);
+        dialog.setScene(scene);
+        dialog.setResizable(false);
+        dialog.showAndWait();
+    }
+    
+    private long calculateNextRunTime(Task task) {
+        if (!task.automation.isRepeted) {
+            return 0; // One-time task, no next run
+        }
+        
+        long currentTime = System.currentTimeMillis();
+        long intervalMs = (long) task.automation.interval * 60 * 1000;
+        
+        // If task is currently running, next run is after it finishes + interval
+        if (task.isWork()) {
+            return task.stop + intervalMs;
+        }
+        
+        // If task hasn't started yet, next run is the start time + interval
+        if (task.start > currentTime) {
+            return task.start + intervalMs;
+        }
+        
+        // If task has finished, calculate when it would run again based on its original schedule
+        if (task.automation.isStartTime) {
+            long originalStart = task.automation.startTime;
+            long timeSinceOriginalStart = currentTime - originalStart;
+            long intervalsCompleted = timeSinceOriginalStart / intervalMs;
+            return originalStart + (intervalsCompleted + 1) * intervalMs;
+        }
+        
+        return 0;
+    }
+    
+    private String formatDuration(long milliseconds) {
+        if (milliseconds < 0) {
+            return "Overdue";
+        }
+        
+        long seconds = milliseconds / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+        
+        if (days > 0) {
+            return String.format("%dd %dh %dm", days, hours % 24, minutes % 60);
+        } else if (hours > 0) {
+            return String.format("%dh %dm", hours, minutes % 60);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds % 60);
+        } else {
+            return String.format("%ds", seconds);
+        }
+    }
 
     public static void main(String[] args) {
         launch();

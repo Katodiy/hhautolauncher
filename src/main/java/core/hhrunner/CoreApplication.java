@@ -33,9 +33,7 @@ public class CoreApplication extends Application {
     private static final String AUTOMATIONS_FILE = "automations.json";
 
     TextField title;
-    TextField user;
-    TextField password;
-    TextField character;
+    ComboBox<String> characterSelector;
     TextField nomadPath;
 
     TextField range;
@@ -62,9 +60,7 @@ public class CoreApplication extends Application {
 
     void clear(){
         title.setText("");
-        user.setText("");
-        password.setText("");
-        character.setText("");
+        characterSelector.setValue(null);
         range.setText("0");
         duration.setText("0");
         isRepeted.setSelected(false);
@@ -429,9 +425,18 @@ public class CoreApplication extends Application {
     private Automation build() {
         Automation auto = new Automation();
         auto.name = title.getText();
-        auto.user = user.getText();
-        auto.password = password.getText();
-        auto.character = character.getText();
+        
+        String selectedCharacter = characterSelector.getValue();
+        Account account = getAccountForCharacter(selectedCharacter);
+        if (account != null) {
+            auto.user = account.username;
+            auto.password = account.password;
+            auto.character = getCharacterNameFromSelection(selectedCharacter);
+        } else {
+            auto.user = "";
+            auto.password = "";
+            auto.character = selectedCharacter != null ? selectedCharacter : "";
+        }
         String selectedScenario = scenarioPicker.getSelectionModel().getSelectedItem();
         if (selectedScenario != null && selectedScenario.contains("ID:")) {
             auto.scenarioId = Integer.parseInt(selectedScenario.replaceAll("[^0-9]", ""));
@@ -568,9 +573,21 @@ public class CoreApplication extends Application {
         Automation auto = automations.get(name);
         if(auto != null) {
             title.setText(auto.name);
-            user.setText(auto.user);
-            password.setText(auto.password);
-            character.setText(auto.character);
+            
+            // Find and select the correct character in the dropdown
+            String targetSelection = auto.character + " (" + auto.user + ")";
+            boolean found = false;
+            for (String item : characterSelector.getItems()) {
+                if (item.equals(targetSelection)) {
+                    characterSelector.setValue(item);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Fallback - just set the character name if account not found
+                characterSelector.setValue(auto.character);
+            }
 
             range.setText(String.valueOf(auto.interval));
             duration.setText(String.valueOf(auto.duration));
@@ -789,32 +806,15 @@ public class CoreApplication extends Application {
         propBox.setPrefWidth(350);
         propBox.setSpacing(7);
 
-        HBox userBox  = new HBox();
-        userBox.setSpacing(10);
-        Label userLabel = new Label("User");
-        userLabel.setPrefWidth(120);
-        userBox.getChildren().add(userLabel);
-        user = new TextField();
-        user.setPrefWidth(200);
-        userBox.getChildren().add(user);
-
-        HBox passwordBox  = new HBox();
-        passwordBox.setSpacing(10);
-        Label passwordLabel = new Label("Password");
-        passwordLabel.setPrefWidth(120);
-        passwordBox.getChildren().add(passwordLabel);
-        password = new PasswordField();
-        password.setPrefWidth(200);
-        passwordBox.getChildren().add(password);
-
         HBox characterBox  = new HBox();
         characterBox.setSpacing(10);
         Label characterLabel = new Label("Character");
         characterLabel.setPrefWidth(120);
         characterBox.getChildren().add(characterLabel);
-        character = new TextField();
-        character.setPrefWidth(200);
-        characterBox.getChildren().add(character);
+        characterSelector = new ComboBox<>();
+        characterSelector.setPrefWidth(200);
+        updateCharacterSelector();
+        characterBox.getChildren().add(characterSelector);
 
         HBox rangeBox  = new HBox();
         rangeBox.setSpacing(10);
@@ -855,8 +855,6 @@ public class CoreApplication extends Application {
         duration.setText("0");
         durationBox.getChildren().add(duration);
 
-        propBox.getChildren().add(userBox);
-        propBox.getChildren().add(passwordBox);
         propBox.getChildren().add(characterBox);
         propBox.getChildren().add(durationBox);
 
@@ -1397,6 +1395,7 @@ public class CoreApplication extends Application {
                 String username = selected.split(" \\(")[0];
                 accounts.remove(username);
                 saveAccounts();
+                updateCharacterSelector();
                 refreshAccountList(accountList);
                 characterList.setItems(FXCollections.observableArrayList());
             }
@@ -1418,6 +1417,7 @@ public class CoreApplication extends Application {
                 if (account != null) {
                     account.removeCharacter(selectedCharacter);
                     saveAccounts();
+                updateCharacterSelector();
                     refreshAccountList(accountList);
                     ObservableList<String> chars = FXCollections.observableArrayList(account.characters);
                     characterList.setItems(chars);
@@ -1473,6 +1473,7 @@ public class CoreApplication extends Application {
             if (!username.isEmpty() && !password.isEmpty() && !accounts.containsKey(username)) {
                 accounts.put(username, new Account(username, password));
                 saveAccounts();
+                updateCharacterSelector();
                 refreshAccountList(accountList);
                 dialog.close();
             }
@@ -1519,6 +1520,7 @@ public class CoreApplication extends Application {
                 account.password = newPassword;
                 accounts.put(newUsername, account);
                 saveAccounts();
+                updateCharacterSelector();
                 refreshAccountList(accountList);
                 characterList.setItems(FXCollections.observableArrayList());
                 dialog.close();
@@ -1556,6 +1558,7 @@ public class CoreApplication extends Application {
                 if (account != null) {
                     account.addCharacter(characterName);
                     saveAccounts();
+                updateCharacterSelector();
                     refreshAccountList(accountList);
                     ObservableList<String> chars = FXCollections.observableArrayList(account.characters);
                     characterList.setItems(chars);
@@ -1834,6 +1837,32 @@ public class CoreApplication extends Application {
         }
         
         throw new RuntimeException("Unable to resolve accounts file path");
+    }
+
+    private void updateCharacterSelector() {
+        characterSelector.getItems().clear();
+        for (Account account : accounts.values()) {
+            for (String character : account.characters) {
+                characterSelector.getItems().add(character + " (" + account.username + ")");
+            }
+        }
+    }
+
+    private Account getAccountForCharacter(String characterSelection) {
+        if (characterSelection == null || !characterSelection.contains(" (")) {
+            return null;
+        }
+        
+        String accountName = characterSelection.substring(characterSelection.lastIndexOf(" (") + 2, characterSelection.lastIndexOf(")"));
+        return accounts.get(accountName);
+    }
+
+    private String getCharacterNameFromSelection(String characterSelection) {
+        if (characterSelection == null || !characterSelection.contains(" (")) {
+            return characterSelection;
+        }
+        
+        return characterSelection.substring(0, characterSelection.lastIndexOf(" ("));
     }
 
     public static void main(String[] args) {

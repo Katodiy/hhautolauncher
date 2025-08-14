@@ -42,7 +42,6 @@ public class CoreApplication extends Application {
 
     TextField duration;
 
-    CheckBox disable;
     CheckBox isRepeted;
     CheckBox isStartTime;
 
@@ -68,7 +67,6 @@ public class CoreApplication extends Application {
         character.setText("");
         range.setText("0");
         duration.setText("0");
-        disable.setSelected(false);
         isRepeted.setSelected(false);
         isStartTime.setSelected(false);
         dataPicker.setTime(0);
@@ -82,6 +80,7 @@ public class CoreApplication extends Application {
     HashMap<Integer, Scenario> loadedScenarios = new HashMap<>();
     HashMap<String, Schedule> schedules = new HashMap<>();
     String currentScheduleName = "Default Schedule";
+    HashMap<String, Account> accounts = new HashMap<>();
     
     ListView<String> scenarioPicker;
     ComboBox<String> automationComboBox;
@@ -439,7 +438,6 @@ public class CoreApplication extends Application {
         }
         auto.isStartTime = isStartTime.isSelected();
         auto.startTime = dataPicker.getTime();
-        auto.disabled = disable.isSelected();
         auto.isRepeted = isRepeted.isSelected();
         auto.duration = Integer.parseInt(duration.getText());
         auto.interval = Integer.parseInt(range.getText());
@@ -576,7 +574,6 @@ public class CoreApplication extends Application {
 
             range.setText(String.valueOf(auto.interval));
             duration.setText(String.valueOf(auto.duration));
-            disable.setSelected(auto.disabled);
             isRepeted.setSelected(auto.isRepeted);
             isStartTime.setSelected(auto.isStartTime);
             dataPicker.setTime(auto.startTime);
@@ -600,6 +597,7 @@ public class CoreApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         loadSchedules();
+        loadAccounts();
         /// Главное меню
         MenuBar menuBar = new MenuBar();
         Menu menu1 = new Menu("File");
@@ -689,7 +687,15 @@ public class CoreApplication extends Application {
             }
         });
 
-        menu1.getItems().addAll(openn, openi, savei, config);
+        MenuItem accounts = new MenuItem("Accounts");
+        accounts.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                showAccountsDialog();
+            }
+        });
+
+        menu1.getItems().addAll(openn, openi, savei, config, accounts);
 
         ObservableList<String> langs = FXCollections.observableArrayList();
         automationComboBox = new ComboBox<String>(langs);
@@ -708,7 +714,7 @@ public class CoreApplication extends Application {
         /// Основной слой
         VBox centrallayout = new VBox();
         VBox.setMargin(centrallayout, new Insets(5,15,5,15));
-        centrallayout.setPadding(new Insets(0,10,0,10));
+        centrallayout.setPadding(new Insets(10,10,0,10));
         centrallayout.setSpacing(5);
         
         // Schedule management section
@@ -769,7 +775,7 @@ public class CoreApplication extends Application {
         HBox titleBox  = new HBox();
         titleBox.getChildren().add(new Label("Automation name"));
         title = new TextField();
-        titleBox.setSpacing(30);
+        titleBox.setSpacing(34);
         titleBox.setAlignment(Pos.CENTER_RIGHT);
         HBox.setHgrow(title, Priority.ALWAYS);
         HBox.setMargin(title, new Insets(5,5,0,0));
@@ -782,8 +788,6 @@ public class CoreApplication extends Application {
         propBox.setMinWidth(350);
         propBox.setPrefWidth(350);
         propBox.setSpacing(7);
-        disable = new CheckBox("Disable");
-        propBox.getChildren().add(disable);
 
         HBox userBox  = new HBox();
         userBox.setSpacing(10);
@@ -1328,6 +1332,246 @@ public class CoreApplication extends Application {
         throw new RuntimeException("Unable to resolve schedule file path");
     }
 
+    private void showAccountsDialog() {
+        Stage dialog = new Stage();
+        dialog.setTitle("Account Management");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox mainLayout = new VBox(10);
+        mainLayout.setPadding(new Insets(20));
+        
+        // Account list section
+        Label accountsLabel = new Label("Accounts:");
+        accountsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+        
+        ListView<String> accountList = new ListView<>();
+        accountList.setPrefHeight(150);
+        accountList.setPrefWidth(300);
+        refreshAccountList(accountList);
+        
+        // Account buttons
+        HBox accountButtons = new HBox(10);
+        Button addAccountBtn = new Button("Add Account");
+        Button editAccountBtn = new Button("Edit Account");
+        Button deleteAccountBtn = new Button("Delete Account");
+        accountButtons.getChildren().addAll(addAccountBtn, editAccountBtn, deleteAccountBtn);
+        
+        // Character section
+        Label charactersLabel = new Label("Characters for selected account:");
+        charactersLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+        
+        ListView<String> characterList = new ListView<>();
+        characterList.setPrefHeight(100);
+        characterList.setPrefWidth(300);
+        
+        // Character buttons
+        HBox characterButtons = new HBox(10);
+        Button addCharacterBtn = new Button("Add Character");
+        Button deleteCharacterBtn = new Button("Delete Character");
+        characterButtons.getChildren().addAll(addCharacterBtn, deleteCharacterBtn);
+        
+        // Account selection listener
+        accountList.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            if (newSelection != null) {
+                String username = newSelection.split(" \\(")[0]; // Extract username before " ("
+                Account account = accounts.get(username);
+                if (account != null) {
+                    ObservableList<String> chars = FXCollections.observableArrayList(account.characters);
+                    characterList.setItems(chars);
+                }
+            }
+        });
+        
+        // Button actions
+        addAccountBtn.setOnAction(e -> showAddAccountDialog(accountList, characterList));
+        editAccountBtn.setOnAction(e -> {
+            String selected = accountList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String username = selected.split(" \\(")[0];
+                showEditAccountDialog(username, accountList, characterList);
+            }
+        });
+        deleteAccountBtn.setOnAction(e -> {
+            String selected = accountList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String username = selected.split(" \\(")[0];
+                accounts.remove(username);
+                saveAccounts();
+                refreshAccountList(accountList);
+                characterList.setItems(FXCollections.observableArrayList());
+            }
+        });
+        
+        addCharacterBtn.setOnAction(e -> {
+            String selected = accountList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String username = selected.split(" \\(")[0];
+                showAddCharacterDialog(username, characterList, accountList);
+            }
+        });
+        deleteCharacterBtn.setOnAction(e -> {
+            String selectedAccount = accountList.getSelectionModel().getSelectedItem();
+            String selectedCharacter = characterList.getSelectionModel().getSelectedItem();
+            if (selectedAccount != null && selectedCharacter != null) {
+                String username = selectedAccount.split(" \\(")[0];
+                Account account = accounts.get(username);
+                if (account != null) {
+                    account.removeCharacter(selectedCharacter);
+                    saveAccounts();
+                    refreshAccountList(accountList);
+                    ObservableList<String> chars = FXCollections.observableArrayList(account.characters);
+                    characterList.setItems(chars);
+                }
+            }
+        });
+        
+        // Close button
+        Button closeBtn = new Button("Close");
+        closeBtn.setOnAction(e -> dialog.close());
+        
+        mainLayout.getChildren().addAll(
+            accountsLabel, accountList, accountButtons,
+            charactersLabel, characterList, characterButtons,
+            closeBtn
+        );
+        
+        Scene scene = new Scene(mainLayout, 400, 500);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+    
+    private void refreshAccountList(ListView<String> accountList) {
+        ObservableList<String> accountNames = FXCollections.observableArrayList();
+        for (Account account : accounts.values()) {
+            accountNames.add(account.toString());
+        }
+        accountList.setItems(accountNames);
+    }
+    
+    private void showAddAccountDialog(ListView<String> accountList, ListView<String> characterList) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Add Account");
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        
+        Label usernameLabel = new Label("Username:");
+        TextField usernameField = new TextField();
+        
+        Label passwordLabel = new Label("Password:");
+        PasswordField passwordField = new PasswordField();
+        
+        HBox buttons = new HBox(10);
+        Button addBtn = new Button("Add");
+        Button cancelBtn = new Button("Cancel");
+        buttons.getChildren().addAll(addBtn, cancelBtn);
+        
+        addBtn.setOnAction(e -> {
+            String username = usernameField.getText().trim();
+            String password = passwordField.getText();
+            if (!username.isEmpty() && !password.isEmpty() && !accounts.containsKey(username)) {
+                accounts.put(username, new Account(username, password));
+                saveAccounts();
+                refreshAccountList(accountList);
+                dialog.close();
+            }
+        });
+        cancelBtn.setOnAction(e -> dialog.close());
+        
+        layout.getChildren().addAll(usernameLabel, usernameField, passwordLabel, passwordField, buttons);
+        
+        Scene scene = new Scene(layout, 300, 200);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+    
+    private void showEditAccountDialog(String username, ListView<String> accountList, ListView<String> characterList) {
+        Account account = accounts.get(username);
+        if (account == null) return;
+        
+        Stage dialog = new Stage();
+        dialog.setTitle("Edit Account - " + username);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        
+        Label usernameLabel = new Label("Username:");
+        TextField usernameField = new TextField(account.username);
+        
+        Label passwordLabel = new Label("Password:");
+        PasswordField passwordField = new PasswordField();
+        passwordField.setText(account.password);
+        
+        HBox buttons = new HBox(10);
+        Button saveBtn = new Button("Save");
+        Button cancelBtn = new Button("Cancel");
+        buttons.getChildren().addAll(saveBtn, cancelBtn);
+        
+        saveBtn.setOnAction(e -> {
+            String newUsername = usernameField.getText().trim();
+            String newPassword = passwordField.getText();
+            if (!newUsername.isEmpty() && !newPassword.isEmpty()) {
+                // Remove old account and add updated one
+                accounts.remove(username);
+                account.username = newUsername;
+                account.password = newPassword;
+                accounts.put(newUsername, account);
+                saveAccounts();
+                refreshAccountList(accountList);
+                characterList.setItems(FXCollections.observableArrayList());
+                dialog.close();
+            }
+        });
+        cancelBtn.setOnAction(e -> dialog.close());
+        
+        layout.getChildren().addAll(usernameLabel, usernameField, passwordLabel, passwordField, buttons);
+        
+        Scene scene = new Scene(layout, 300, 200);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+    
+    private void showAddCharacterDialog(String username, ListView<String> characterList, ListView<String> accountList) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Add Character to " + username);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        
+        Label characterLabel = new Label("Character Name:");
+        TextField characterField = new TextField();
+        
+        HBox buttons = new HBox(10);
+        Button addBtn = new Button("Add");
+        Button cancelBtn = new Button("Cancel");
+        buttons.getChildren().addAll(addBtn, cancelBtn);
+        
+        addBtn.setOnAction(e -> {
+            String characterName = characterField.getText().trim();
+            if (!characterName.isEmpty()) {
+                Account account = accounts.get(username);
+                if (account != null) {
+                    account.addCharacter(characterName);
+                    saveAccounts();
+                    refreshAccountList(accountList);
+                    ObservableList<String> chars = FXCollections.observableArrayList(account.characters);
+                    characterList.setItems(chars);
+                }
+                dialog.close();
+            }
+        });
+        cancelBtn.setOnAction(e -> dialog.close());
+        
+        layout.getChildren().addAll(characterLabel, characterField, buttons);
+        
+        Scene scene = new Scene(layout, 300, 150);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
     private void showPauseControlDialog(Task task) {
         Stage dialog = new Stage();
         dialog.setTitle("Pause Control - " + task.getName());
@@ -1499,6 +1743,97 @@ public class CoreApplication extends Application {
         } else {
             return String.format("%ds", seconds);
         }
+    }
+
+    private void saveAccounts() {
+        JSONObject obj = new JSONObject();
+        JSONArray accountsArray = new JSONArray();
+        
+        for (Account account : accounts.values()) {
+            JSONObject accountObj = new JSONObject();
+            accountObj.put("username", account.username);
+            accountObj.put("password", account.password);
+            
+            JSONArray charactersArray = new JSONArray();
+            for (String character : account.characters) {
+                charactersArray.add(character);
+            }
+            accountObj.put("characters", charactersArray);
+            
+            accountsArray.add(accountObj);
+        }
+        
+        obj.put("accounts", accountsArray);
+        
+        String path = getAccountsFilePath();
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(path), StandardCharsets.UTF_8)) {
+            writer.write(obj.toJSONString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadAccounts() {
+        try {
+            String path = getAccountsFilePath();
+            File file = new File(path);
+            if (!file.exists()) {
+                return; // No accounts file yet
+            }
+            
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8));
+            JSONParser parser = new JSONParser();
+            JSONObject jsonObject = (JSONObject) parser.parse(reader);
+            
+            accounts.clear();
+            
+            JSONArray accountsArray = (JSONArray) jsonObject.get("accounts");
+            if (accountsArray != null) {
+                for (Object accountObj : accountsArray) {
+                    JSONObject account = (JSONObject) accountObj;
+                    String username = (String) account.get("username");
+                    String password = (String) account.get("password");
+                    
+                    Account acc = new Account(username, password);
+                    
+                    JSONArray charactersArray = (JSONArray) account.get("characters");
+                    if (charactersArray != null) {
+                        for (Object characterObj : charactersArray) {
+                            acc.addCharacter((String) characterObj);
+                        }
+                    }
+                    
+                    accounts.put(username, acc);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error loading accounts: " + e.getMessage());
+        }
+    }
+
+    private String getAccountsFilePath() {
+        String appdata = System.getenv("APPDATA");
+        if (appdata != null) {
+            File base = new File(appdata, "Haven and Hearth");
+            if (!base.exists()) {
+                base.mkdirs();
+            }
+            File accountsFile = new File(base, "hhrunner.accounts.json");
+            return accountsFile.getAbsolutePath();
+        }
+
+        String userHome = System.getProperty("user.home");
+        if (userHome != null) {
+            File base = new File(userHome, ".haven");
+            if (!base.exists()) {
+                base.mkdirs();
+            }
+            File accountsFile = new File(base, "hhrunner.accounts.json");
+            return accountsFile.getAbsolutePath();
+        }
+        
+        throw new RuntimeException("Unable to resolve accounts file path");
     }
 
     public static void main(String[] args) {
